@@ -73,8 +73,7 @@ Exemplo: - [ ] Salvar filtros favoritos no navegador
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
-- [x] **v0.2.2 (build 2):** Micro-animações e feedback tátil estendidos a todos os botões da aplicação (Atualizar Dados, Apenas Salas Livres, Limpar Filtros, Apenas colunas com match e botões/links das disciplinas na tabela de horários).
-- [x] **v0.2.2 (build 1):** Micro-animações nas transições dos chips de filtros (hover com micro-elevação, compressão tátil no clique/toque `:active`, transição suave de cores e sombras, e suporte a `prefers-reduced-motion`).
+- [x] **v0.3.0:** Micro-animações e feedback tátil fluido em todos os botões e links da aplicação (chips de filtros, botões de ação rápida, ações da grade e links de disciplinas do Jupiterweb e Janus na tabela), com suporte completo a `prefers-reduced-motion` e prevenção de atraso de toque em dispositivos móveis.
 - [x] **v0.2.0:** Destaque visual do horário vigente e do dia de hoje no cabeçalho (cores temáticas do botão Agora/Hoje, prefixo com símbolo "⚡ " e tipografia em negrito).
 - [x] **v0.1.4:** Implementação da sincronização seletiva de arquivos no comando `gas_sync.py push <arquivo>`.
 - [x] **v0.1.3:** Estrutura formal de versionamento SemVer (`version.json`) e contador de build automático integrado ao `watch`.
