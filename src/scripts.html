@@ -540,7 +540,6 @@
     estadoApp.horaFimMin = (valFim !== 'todos') ? parseInt(valFim, 10) : null;
 
     atualizarEstiloValidacaoHorarios();
-    atualizarBadgeHorarios();
     aplicarFiltrosEAtualizarVisualizacao();
   }
 
@@ -624,7 +623,6 @@
     }
 
     atualizarEstiloValidacaoHorarios();
-    atualizarBadgeHorarios();
 
     // 5. Aplica a visualização atualizada
     aplicarFiltrosEAtualizarVisualizacao();
@@ -636,20 +634,7 @@
     estadoApp.horaInicioMin = null;
     estadoApp.horaFimMin = null;
     atualizarEstiloValidacaoHorarios();
-    atualizarBadgeHorarios();
     aplicarFiltrosEAtualizarVisualizacao();
-  }
-
-  function atualizarBadgeHorarios() {
-    const badge = document.getElementById('badge-horario-resumo');
-    if (!badge) return;
-    if (estadoApp.horaInicioMin === null && estadoApp.horaFimMin === null) {
-      badge.textContent = 'Todos';
-    } else {
-      const tIni = estadoApp.horaInicioMin !== null ? minParaTexto(estadoApp.horaInicioMin) : '';
-      const tFim = estadoApp.horaFimMin !== null ? minParaTexto(estadoApp.horaFimMin) : '';
-      badge.textContent = `${tIni || 'Início'} ➔ ${tFim || 'Fim'}`;
-    }
   }
 
   function minParaTexto(min) {
