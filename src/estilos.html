@@ -425,6 +425,24 @@
     border-color: var(--primary);
   }
 
+  .select-padrao.select-invalido {
+    color: #dc2626 !important;
+    background-color: #fee2e2 !important;
+    border-color: #ef4444 !important;
+    font-weight: 600;
+  }
+
+  .select-padrao.select-invalido:focus {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  }
+
+  .select-padrao.select-invalido option {
+    color: var(--text-main);
+    background-color: #ffffff;
+    font-weight: normal;
+  }
+
   /* Capacidade Controles */
   .capacidade-controles {
     display: flex;

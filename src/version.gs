@@ -4,6 +4,6 @@
  */
 
 const APP_VERSION = 'v0.2.1';
-const APP_BUILD = 1;
-const APP_BUILD_TIME = '22/09/2026 16:11';
-const APP_FULL_VERSION = 'v0.2.1 (build 1)';
+const APP_BUILD = 2;
+const APP_BUILD_TIME = '22/09/2026 16:27';
+const APP_FULL_VERSION = 'v0.2.1 (build 2)';

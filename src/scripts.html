@@ -369,16 +369,23 @@
 
     const valIni = selIni.value;
     const valFim = selFim.value;
-    const iniNum = (valIni !== 'todos') ? parseInt(valIni, 10) : null;
-    const fimNum = (valFim !== 'todos') ? parseInt(valFim, 10) : null;
 
     if (origem === 'inicio' || origem === 'ambos') {
-      const optsFim = (iniNum !== null)
-        ? estadoApp.horariosFimDisponiveis.filter(o => o.min > iniNum)
-        : estadoApp.horariosFimDisponiveis;
+      selIni.innerHTML = '<option value="todos">Todos os horários</option>';
+      (estadoApp.horariosInicioDisponiveis || []).forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.min;
+        opt.textContent = o.label;
+        selIni.appendChild(opt);
+      });
+      if (valIni !== 'todos' && selIni.querySelector(`option[value="${valIni}"]`)) {
+        selIni.value = valIni;
+      }
+    }
 
+    if (origem === 'fim' || origem === 'ambos') {
       selFim.innerHTML = '<option value="todos">Todos os horários</option>';
-      optsFim.forEach(o => {
+      (estadoApp.horariosFimDisponiveis || []).forEach(o => {
         const opt = document.createElement('option');
         opt.value = o.min;
         opt.textContent = o.label;
@@ -389,22 +396,22 @@
       }
     }
 
-    if (origem === 'fim' || origem === 'ambos') {
-      const optsIni = (fimNum !== null)
-        ? estadoApp.horariosInicioDisponiveis.filter(o => o.min < fimNum)
-        : estadoApp.horariosInicioDisponiveis;
+    atualizarEstiloValidacaoHorarios();
+  }
 
-      selIni.innerHTML = '<option value="todos">Todos os horários</option>';
-      optsIni.forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = o.min;
-        opt.textContent = o.label;
-        selIni.appendChild(opt);
-      });
-      if (valIni !== 'todos' && selIni.querySelector(`option[value="${valIni}"]`)) {
-        selIni.value = valIni;
-      }
-    }
+  function atualizarEstiloValidacaoHorarios() {
+    const selIni = document.getElementById('sel-hora-inicio');
+    const selFim = document.getElementById('sel-hora-fim');
+    if (!selIni || !selFim) return;
+
+    const valIni = selIni.value;
+    const valFim = selFim.value;
+
+    // Se ambos tiverem horários específicos selecionados e início >= término
+    const ehInvalido = (valIni !== 'todos' && valFim !== 'todos' && parseInt(valIni, 10) >= parseInt(valFim, 10));
+
+    selIni.classList.toggle('select-invalido', ehInvalido);
+    selFim.classList.toggle('select-invalido', ehInvalido);
   }
 
   function configurarLimiteCapacidade(salas) {
@@ -526,14 +533,13 @@
   }
 
   function aoAlterarHorario(isInicio) {
-    atualizarOpcoesDropdownsHorarios(isInicio ? 'inicio' : 'fim');
-
     const valIni = document.getElementById('sel-hora-inicio').value;
     const valFim = document.getElementById('sel-hora-fim').value;
 
     estadoApp.horaInicioMin = (valIni !== 'todos') ? parseInt(valIni, 10) : null;
     estadoApp.horaFimMin = (valFim !== 'todos') ? parseInt(valFim, 10) : null;
 
+    atualizarEstiloValidacaoHorarios();
     atualizarBadgeHorarios();
     aplicarFiltrosEAtualizarVisualizacao();
   }
@@ -604,9 +610,6 @@
       }
     }
 
-    // Atualiza opções disponíveis no dropdown de término
-    atualizarOpcoesDropdownsHorarios('inicio');
-
     // 4. Ajusta o select de Término (sel-hora-fim) delimitando o intervalo do bloco
     if (selFim && estadoApp.horariosFimDisponiveis.length > 0) {
       const optsValidasFim = (estadoApp.horaInicioMin !== null)
@@ -620,7 +623,7 @@
       }
     }
 
-    atualizarOpcoesDropdownsHorarios('fim');
+    atualizarEstiloValidacaoHorarios();
     atualizarBadgeHorarios();
 
     // 5. Aplica a visualização atualizada
@@ -632,7 +635,7 @@
     document.getElementById('sel-hora-fim').value = 'todos';
     estadoApp.horaInicioMin = null;
     estadoApp.horaFimMin = null;
-    atualizarOpcoesDropdownsHorarios('ambos');
+    atualizarEstiloValidacaoHorarios();
     atualizarBadgeHorarios();
     aplicarFiltrosEAtualizarVisualizacao();
   }
