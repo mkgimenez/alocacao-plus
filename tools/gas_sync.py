@@ -10,6 +10,7 @@ Uso:
     python tools/gas_sync.py bump [patch|minor|major|<versao>]  # Promove versão e reseta build (ex: bump patch)
     python tools/gas_sync.py build             # Incrementa manualmente o número de build
     python tools/gas_sync.py version           # Exibe informações da versão e build atuais
+    python tools/gas_sync.py deploy [desc]     # Cria versão e atualiza a implantação de trabalho (Web App) no Apps Script
     python tools/gas_sync.py idea "Sua ideia"  # Anota rapidamente uma ideia/tarefa na Inbox do BACKLOG.md
     python tools/gas_sync.py status            # Exibe informações do projeto no Apps Script
     python tools/gas_sync.py init <SCRIPT_ID>  # Configura o Script ID do projeto
@@ -767,22 +768,114 @@ def watch(service, script_id):
         print("\n\n🛑 Monitoramento encerrado pelo usuário. Até logo!")
 
 
+def deploy(service, script_id, descricao=None):
+    """
+    Cria uma nova versão no Apps Script e atualiza a implantação de trabalho (Web App) existente.
+    """
+    dados_v = carregar_versao()
+    desc = descricao or dados_v.get("full_version", dados_v.get("version", "v0.1.0"))
+
+    print(f"\n📦 Preparando atualização da implantação de trabalho para '{desc}'...")
+
+    # 1. Cria nova versão do projeto
+    try:
+        res_ver = service.projects().versions().create(scriptId=script_id, body={"description": desc}).execute()
+        num_versao = res_ver.get("versionNumber")
+        print(f"✅ Versão #{num_versao} criada no Apps Script ({desc})")
+    except HttpError as e:
+        print(f"❌ Erro ao criar versão no Apps Script: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Erro inesperado ao criar versão: {e}")
+        return False
+
+    # 2. Localiza a implantação de trabalho (Web App público)
+    try:
+        res_deps = service.projects().deployments().list(scriptId=script_id).execute()
+        deployments = res_deps.get("deployments", [])
+
+        dep_alvo = None
+        for d in deployments:
+            if d.get("updateTime") == "1970-01-01T00:00:00Z":
+                continue
+            for ep in d.get("entryPoints", []):
+                if ep.get("entryPointType") == "WEB_APP":
+                    dep_alvo = d
+                    break
+            if dep_alvo:
+                break
+
+        if not dep_alvo:
+            for d in deployments:
+                if d.get("deploymentConfig", {}).get("versionNumber"):
+                    dep_alvo = d
+                    break
+
+        if not dep_alvo:
+            print("⚠️  Nenhuma implantação de Web App encontrada para atualizar.")
+            print("Crie uma implantação inicial pelo editor do Apps Script (Implantar > Nova Implantação).")
+            return False
+
+        dep_id = dep_alvo["deploymentId"]
+        url_webapp = None
+        for ep in dep_alvo.get("entryPoints", []):
+            if ep.get("entryPointType") == "WEB_APP":
+                url_webapp = ep.get("webApp", {}).get("url")
+
+        # 3. Atualiza a implantação
+        corpo_dep = {
+            "deploymentConfig": {
+                "scriptId": script_id,
+                "versionNumber": num_versao,
+                "manifestFileName": "appsscript",
+                "description": desc
+            }
+        }
+        res_dep = service.projects().deployments().update(
+            scriptId=script_id,
+            deploymentId=dep_id,
+            body=corpo_dep
+        ).execute()
+
+        for ep in res_dep.get("entryPoints", []):
+            if ep.get("entryPointType") == "WEB_APP":
+                url_webapp = ep.get("webApp", {}).get("url") or url_webapp
+
+        print("\n" + "=" * 60)
+        print("🚀 IMPLANTAÇÃO DE TRABALHO ATUALIZADA COM SUCESSO!")
+        print("=" * 60)
+        print(f"🏷️  Versão:          {desc}")
+        print(f"🔢 Número da Versão: #{num_versao}")
+        print(f"🆔 Deployment ID:    {dep_id}")
+        if url_webapp:
+            print(f"🌐 URL do Web App:   {url_webapp}")
+        print("=" * 60 + "\n")
+        return True
+
+    except HttpError as e:
+        print(f"❌ Erro ao atualizar implantação no Apps Script: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Erro inesperado ao atualizar implantação: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Sincronizador Automático do Alocação Plus com o Google Apps Script"
     )
     parser.add_argument(
         "comando",
-        choices=["push", "pull", "watch", "status", "init", "bump", "build", "version", "idea", "backlog"],
+        choices=["push", "pull", "watch", "status", "init", "bump", "build", "version", "deploy", "idea", "backlog"],
         nargs="?",
         default="push",
-        help="Ação a executar: push (padrão), pull, watch, status, init, bump, build, version ou idea/backlog"
+        help="Ação a executar: push (padrão), pull, watch, status, init, bump, build, version, deploy ou idea/backlog"
     )
     parser.add_argument(
         "parametro",
         nargs="?",
         default=None,
-        help="Parâmetro adicional (ex: Script ID no 'init', arquivo específico no 'push' ou texto da ideia)"
+        help="Parâmetro adicional (ex: Script ID no 'init', arquivo específico no 'push', descrição no 'deploy' ou texto da ideia)"
     )
     parser.add_argument(
         "--script-id",
@@ -857,6 +950,8 @@ def main():
         pull(service, script_id)
     elif args.comando == "status":
         status(service, script_id)
+    elif args.comando == "deploy":
+        deploy(service, script_id, descricao=args.parametro)
     elif args.comando == "watch":
         watch(service, script_id)
 
