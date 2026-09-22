@@ -1185,13 +1185,12 @@
         }
 
         const celEfetiva = (cel && cel.t) ? cel : obterCelulaEfetiva(linhaCels, cOrig);
-        const temAula = Boolean(celEfetiva && celEfetiva.t);
+        const temAula = Boolean(celEfetiva && celEfetiva.t && celEfetiva.t.trim() !== '');
 
         // Calcula quantos slots visíveis consecutivos esta célula ocupa
         let colspanVisivel = 1;
-        const celComMerge = (cel && cel.cs) ? cel : (celEfetiva && celEfetiva.cs ? celEfetiva : null);
-        if (celComMerge && celComMerge.cs > 1) {
-          const colFimOrig = (cel && cel.cs) ? (cOrig + cel.cs) : (linhaCels.indexOf(celEfetiva) + celEfetiva.cs);
+        if (temAula && celEfetiva.cs && celEfetiva.cs > 1) {
+          const colFimOrig = cOrig + celEfetiva.cs;
           for (let next = colIdxRelativo + 1; next < slotsAtivos.length; next++) {
             if (slotsAtivos[next].cIdx < colFimOrig) {
               colspanVisivel++;
@@ -1203,7 +1202,7 @@
 
         const csAttr = (colspanVisivel > 1) ? ` colspan="${colspanVisivel}"` : '';
         const bgStyle = (celEfetiva && celEfetiva.bg) ? ` style="background-color: ${celEfetiva.bg};"` : '';
-        const aulaClass = temAula ? (celEfetiva.pos ? ' celula-aula celula-pos' : ' celula-aula') : '';
+        const aulaClass = temAula ? (celEfetiva.pos ? ' celula-aula celula-pos' : ' celula-aula') : ' celula-livre';
 
         let destaqueClass = '';
         if (temBusca && temAula && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
