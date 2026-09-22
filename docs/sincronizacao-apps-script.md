@@ -82,17 +82,12 @@ python tools/gas_sync.py watch
 **Como opera:**
 1. O script realiza uma primeira sincronização completa para garantir que a nuvem está atualizada.
 2. Em seguida, entra em modo monitor (*polling* de 1 segundo sobre a pasta `src/`).
-3. Toda vez que você salvar qualquer arquivo (`alocacao-plus.gs`, `index.html`, `estilos.html`, etc.), ele detecta a alteração:
+3. Toda vez que você salvar qualquer arquivo (`alocacao-plus.gs`, `index.html`, `estilos.html`, etc.), ele detecta a alteração e atualiza **apenas o arquivo modificado** na nuvem, preservando todos os demais inalterados:
    ```text
-   [11:38:05] ✏️  Alteração detectada: alocacao-plus.gs
-   [11:38:06] 🚀 Enviando 6 arquivos para o Apps Script (1-aBcDeF...)...
-   [11:38:07] ✅ Sincronizado com sucesso! (6 arquivos em nuvem)
-      • appsscript (JSON)
-      • alocacao-plus (SERVER_JS)
-      • config (SERVER_JS)
-      • estilos (HTML)
-      • index (HTML)
-      • scripts (HTML)
+   [13:58:00] ✏️  Alteração detectada: alocacao-plus.gs
+   [13:58:01] 🚀 Atualizando no Apps Script: alocacao-plus.gs...
+   [13:58:03] ✅ Atualizado com sucesso no Apps Script:
+      📝 alocacao-plus
    ```
 4. Pressione `Ctrl + C` no terminal quando desejar interromper o monitoramento.
 
@@ -100,10 +95,15 @@ python tools/gas_sync.py watch
 
 ### 5.2. Envio Manual Sob Demanda (`push`)
 
-Caso prefira enviar apenas quando terminar um conjunto de alterações:
+Você pode enviar todos os arquivos de uma vez ou atualizar **apenas um arquivo específico**:
 
 ```powershell
+# Envio completo de todos os arquivos
 python tools/gas_sync.py push
+
+# Envio seletivo de apenas um arquivo alterado
+python tools/gas_sync.py push alocacao-plus.gs
+python tools/gas_sync.py push index.html
 ```
 
 ---

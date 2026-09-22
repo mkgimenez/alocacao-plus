@@ -20,9 +20,9 @@ O objetivo era viabilizar uma sincronização automática e em tempo real (modo 
 Criar o utilitário [`tools/gas_sync.py`](../../tools/gas_sync.py) baseado na **Google Apps Script REST API v1**:
 1. **Comandos Suportados:**
    * `init <SCRIPT_ID>`: Salva o Script ID localmente em `.gas-config.json` (ignorado no Git).
-   * `push`: Converte todos os arquivos de `src/` (`.gs` $\rightarrow$ `SERVER_JS`, `.html` $\rightarrow$ `HTML`, `appsscript.json` $\rightarrow$ `JSON`) e atualiza o projeto remoto de forma atômica.
+   * `push [arquivo]`: Atualiza todos os arquivos ou apenas um arquivo específico (`python tools/gas_sync.py push alocacao-plus.gs`), preservando os demais remotos inalterados.
    * `pull`: Baixa os arquivos do Apps Script na nuvem para a pasta local `src/`.
-   * `watch`: Monitora alterações em `src/` calculando hashes MD5 dos arquivos a cada 1 segundo. Ao detectar um salvamento (`Ctrl + S`), aguarda 500ms (debounce) e dispara o `push` automaticamente.
+   * `watch`: Monitora alterações em `src/` calculando hashes MD5 dos arquivos a cada 1 segundo. Ao detectar um salvamento (`Ctrl + S`), atualiza **apenas o(s) arquivo(s) modificado(s)** no Apps Script com debounce de 500ms.
    * `status`: Exibe título, data de criação e lista de arquivos remotos.
 2. **Segurança e Autenticação:**
    * Utiliza OAuth 2.0 padrão via `google-auth-oauthlib`.

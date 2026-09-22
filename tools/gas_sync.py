@@ -426,14 +426,116 @@ def carregar_arquivos_locais():
     return files_payload
 
 
-def push(service, script_id):
-    """Envia todos os arquivos de src/ para o Google Apps Script."""
+def converter_arquivo_para_payload(caminho_ou_nome):
+    """Converte um arquivo local em objeto File esperado pela API do Apps Script."""
+    p = Path(caminho_ou_nome)
+    if not p.is_file():
+        p_src = SRC_DIR / p.name
+        if p_src.is_file():
+            p = p_src
+        else:
+            for ext in [".gs", ".html", ".json", ".js"]:
+                cand = SRC_DIR / f"{p.name}{ext}"
+                if cand.is_file():
+                    p = cand
+                    break
+
+    if not p.is_file():
+        return None
+
+    name = p.stem
+    ext = p.suffix.lower()
+
+    if p.name == "appsscript.json":
+        ftype = "JSON"
+        name = "appsscript"
+    elif ext in [".gs", ".js"]:
+        ftype = "SERVER_JS"
+    elif ext == ".html":
+        ftype = "HTML"
+    else:
+        return None
+
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"name": name, "type": ftype, "source": content}
+    except Exception as e:
+        print(f"⚠️  Erro ao ler '{p.name}': {e}")
+        return None
+
+
+def push(service, script_id, arquivos_especificos=None, cache_remoto=None):
+    """
+    Envia arquivos para o Google Apps Script.
+    Se 'arquivos_especificos' for fornecido, atualiza APENAS esses arquivos no Apps Script,
+    preservando os demais arquivos remotos inalterados.
+    """
+    hora_agora = time.strftime("%H:%M:%S")
+
+    # Caso 1: Envio seletivo / diferencial (apenas os arquivos alterados)
+    if arquivos_especificos:
+        if isinstance(arquivos_especificos, (str, Path)):
+            arquivos_especificos = [arquivos_especificos]
+
+        nomes_formatados = [Path(a).name for a in arquivos_especificos]
+        nomes_str = ", ".join(nomes_formatados)
+        print(f"[{hora_agora}] 🚀 Atualizando no Apps Script: {nomes_str}...")
+
+        # Obtém arquivos remotos atuais (do cache_remoto em memória se disponível, ou busca da API)
+        if cache_remoto is not None and isinstance(cache_remoto, list) and len(cache_remoto) > 0:
+            lista_arquivos = cache_remoto
+        else:
+            try:
+                res = service.projects().getContent(scriptId=script_id).execute()
+                lista_arquivos = res.get("files", [])
+            except Exception as e:
+                print(f"⚠️  Aviso ao consultar arquivos remotos: {e}. Usando arquivos locais.")
+                lista_arquivos = carregar_arquivos_locais()
+
+        atualizados_sucesso = []
+        for item in arquivos_especificos:
+            payload_item = converter_arquivo_para_payload(item)
+            if payload_item:
+                encontrado = False
+                for idx, rem in enumerate(lista_arquivos):
+                    if rem.get("name") == payload_item["name"]:
+                        lista_arquivos[idx] = payload_item
+                        encontrado = True
+                        break
+                if not encontrado:
+                    lista_arquivos.append(payload_item)
+                atualizados_sucesso.append(payload_item["name"])
+
+        if not atualizados_sucesso:
+            print("⚠️  Nenhum arquivo válido encontrado para atualizar.")
+            return False
+
+        try:
+            body = {"files": lista_arquivos}
+            service.projects().updateContent(scriptId=script_id, body=body).execute()
+            hora_fim = time.strftime("%H:%M:%S")
+            print(f"[{hora_fim}] ✅ Atualizado com sucesso no Apps Script:")
+            for a in atualizados_sucesso:
+                print(f"   📝 {a}")
+            return True
+        except HttpError as error:
+            print(f"❌ Erro HTTP ao atualizar conteúdo no Apps Script: {error}")
+            if error.resp.status == 403:
+                print("💡 Verifique se a API do Apps Script está ATIVADA em: https://script.google.com/home/usersettings")
+            elif error.resp.status == 404:
+                print(f"💡 Script ID '{script_id}' não encontrado ou sem permissão de acesso.")
+            return False
+        except Exception as e:
+            print(f"❌ Erro inesperado: {e}")
+            return False
+
+    # Caso 2: Envio completo de todos os arquivos de src/
     files = carregar_arquivos_locais()
     if not files:
         print("❌ Nenhum arquivo encontrado para envio.")
         return False
 
-    hora_agora = time.strftime("%H:%M:%S")
     nomes_arquivos = [f"{f['name']} ({f['type']})" for f in files]
     print(f"[{hora_agora}] 🚀 Enviando {len(files)} arquivos para o Apps Script ({script_id})...")
 
@@ -533,7 +635,7 @@ def calcular_hash_pasta(pasta):
 
 
 def watch(service, script_id):
-    """Modo monitor: observa src/ e realiza push automático com incremento de build a cada Ctrl+S."""
+    """Modo monitor: observa src/ e atualiza no Apps Script APENAS os arquivos alterados a cada Ctrl+S."""
     dados_v = carregar_versao()
     gerar_version_gs(dados_v)
 
@@ -545,7 +647,14 @@ def watch(service, script_id):
     print("💡 Pressione Ctrl+C a qualquer momento para interromper.")
     print("=" * 65 + "\n")
 
-    # Primeiro envio garantido
+    # Inicializa cache remoto com os arquivos atuais
+    try:
+        res = service.projects().getContent(scriptId=script_id).execute()
+        cache_remoto = res.get("files", [])
+    except Exception:
+        cache_remoto = carregar_arquivos_locais()
+
+    # Primeiro envio garantido (completo)
     push(service, script_id)
     estado_anterior = calcular_hash_pasta(SRC_DIR)
 
@@ -569,15 +678,15 @@ def watch(service, script_id):
                 # Se apenas o version.gs mudou (ex: comando 'bump' rodado em outro terminal)
                 if modificados == ["version.gs"]:
                     dados_v = carregar_versao()
-                    print(f"\n[{hora}] 🏷️  Versão atualizada externamente: {dados_v.get('full_version', '')}")
+                    print(f"\n[{hora}] 🏷️  Versão atualizada: {dados_v.get('full_version', '')}")
                 else:
                     print(f"\n[{hora}] ✏️  Alteração detectada: {', '.join(modificados)}")
-                    dados_v = incrementar_build()
-                    print(f"[{hora}] 🏷️  Build incrementado: {dados_v.get('full_version', '')}")
 
                 # Debounce de 0.5s para agrupamento de salvamentos
                 time.sleep(0.5)
-                push(service, script_id)
+
+                # Atualiza SOMENTE os arquivos modificados no Apps Script
+                push(service, script_id, arquivos_especificos=modificados, cache_remoto=cache_remoto)
                 estado_anterior = calcular_hash_pasta(SRC_DIR)
 
     except KeyboardInterrupt:
@@ -599,7 +708,7 @@ def main():
         "parametro",
         nargs="?",
         default=None,
-        help="Parâmetro adicional (ex: Script ID no 'init' ou tipo no 'bump' [patch|minor|major|X.Y.Z])"
+        help="Parâmetro adicional (ex: Script ID no 'init' ou arquivo específico no 'push')"
     )
     parser.add_argument(
         "--script-id",
@@ -660,7 +769,7 @@ def main():
 
     # Executa o comando selecionado
     if args.comando == "push":
-        push(service, script_id)
+        push(service, script_id, arquivos_especificos=args.parametro)
     elif args.comando == "pull":
         pull(service, script_id)
     elif args.comando == "status":
