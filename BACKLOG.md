@@ -73,6 +73,7 @@ Exemplo: - [ ] Salvar filtros favoritos no navegador
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v0.2.2 (build 2):** Micro-animações e feedback tátil estendidos a todos os botões da aplicação (Atualizar Dados, Apenas Salas Livres, Limpar Filtros, Apenas colunas com match e botões/links das disciplinas na tabela de horários).
 - [x] **v0.2.2 (build 1):** Micro-animações nas transições dos chips de filtros (hover com micro-elevação, compressão tátil no clique/toque `:active`, transição suave de cores e sombras, e suporte a `prefers-reduced-motion`).
 - [x] **v0.2.0:** Destaque visual do horário vigente e do dia de hoje no cabeçalho (cores temáticas do botão Agora/Hoje, prefixo com símbolo "⚡ " e tipografia em negrito).
 - [x] **v0.1.4:** Implementação da sincronização seletiva de arquivos no comando `gas_sync.py push <arquivo>`.
