@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alocação Plus - EESC-USP</title>
+  <!-- Inclusão dos Estilos CSS Modulares -->
+  <?!= include('estilos'); ?>
+</head>
+<body>
+  <!-- Cabeçalho Principal (Navbar) -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="header-brand">
+        <div class="brand-icon">💡</div>
+        <div>
+          <h1 class="brand-title">Alocação Plus</h1>
+          <p class="brand-subtitle">EESC-USP | Consulta Inteligente de Grade e Ocupação</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="sync-info">
+          <span class="pulse-dot"></span>
+          <span id="txt-ultima-sincronizacao">Carregando dados...</span>
+        </div>
+        <button id="btn-recarregar-dados" class="btn-primary-outline" onclick="solicitarRecarregarDados()">
+          🔄 Atualizar Dados
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="app-main">
+    
+    <!-- Barra Superior de Controle e Filtros -->
+    <section class="filtros-panel" id="painel-filtros">
+      
+      <!-- Linha 1: Dias da Semana & Horário -->
+      <div class="filtros-grid">
+        
+        <!-- Card 1: Dias da Semana -->
+        <div class="filtro-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>📅 Dias da Semana</span>
+              <span id="label-hoje-info" class="badge-hoje"></span>
+            </div>
+            <button type="button" class="btn-hoje" onclick="selecionarHoje()">
+              ⚡ Focar em Hoje
+            </button>
+          </div>
+          <div class="chips-container" id="container-dias">
+            <button type="button" class="chip active" data-dia="todos" onclick="alternarDia('todos')">Todos os Dias</button>
+            <button type="button" class="chip" data-dia="seg" onclick="alternarDia('seg')">Segunda</button>
+            <button type="button" class="chip" data-dia="ter" onclick="alternarDia('ter')">Terça</button>
+            <button type="button" class="chip" data-dia="qua" onclick="alternarDia('qua')">Quarta</button>
+            <button type="button" class="chip" data-dia="qui" onclick="alternarDia('qui')">Quinta</button>
+            <button type="button" class="chip" data-dia="sex" onclick="alternarDia('sex')">Sexta</button>
+            <button type="button" class="chip" data-dia="sab" onclick="alternarDia('sab')">Sábado</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Horário -->
+        <div class="filtro-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>⏰ Horário</span>
+              <span class="badge-status" id="badge-horario-resumo">Todos</span>
+            </div>
+            <div class="btn-group-row">
+              <button type="button" class="btn-agora" onclick="selecionarHorarioAgora()">
+                ⚡ Agora
+              </button>
+              <button type="button" class="btn-secondary-sm" onclick="definirQualquerHorario()">
+                Qualquer Horário
+              </button>
+            </div>
+          </div>
+          <div class="horarios-selects">
+            <div class="campo-grupo">
+              <label for="sel-hora-inicio">A partir das:</label>
+              <select id="sel-hora-inicio" class="select-padrao" onchange="aoAlterarHorario(true)">
+                <option value="todos">Todos os horários</option>
+              </select>
+            </div>
+            <div class="campo-grupo">
+              <label for="sel-hora-fim">Até:</label>
+              <select id="sel-hora-fim" class="select-padrao" onchange="aoAlterarHorario(false)">
+                <option value="todos">Todos os horários</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Blocos -->
+        <div class="filtro-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>🏢 Blocos</span>
+              <span class="badge-status" id="badge-blocos-resumo">Todos</span>
+            </div>
+          </div>
+          <div class="chips-container scroll-chips" id="container-blocos">
+            <button type="button" class="chip active" data-bloco="todos" onclick="alternarBloco('todos')">Todos os Blocos</button>
+            <!-- Blocos dinâmicos inseridos via JavaScript -->
+          </div>
+        </div>
+
+        <!-- Card 4: Salas Específicas -->
+        <div class="filtro-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>🚪 Salas Específicas</span>
+              <span class="badge-status" id="badge-salas-resumo">Todas</span>
+            </div>
+          </div>
+          <div class="chips-container scroll-chips" id="container-salas">
+            <button type="button" class="chip active" data-sala="todas" onclick="alternarSala('todas')">Todas as Salas</button>
+            <!-- Salas dinâmicas inseridas via JavaScript -->
+          </div>
+        </div>
+
+        <!-- Card 5: Capacidade Mínima -->
+        <div class="filtro-card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>🪑 Capacidade Mínima</span>
+              <span class="badge-status" id="badge-capacidade-resumo">Todas</span>
+            </div>
+          </div>
+          <div class="capacidade-controles">
+            <div class="input-com-sufixo">
+              <input type="number" id="input-capacidade-min" class="input-padrao" min="1" max="100" placeholder="Ex: 40 lugares" oninput="aoDigitarCapacidade(this.value)">
+              <span class="sufixo-label">lugares</span>
+            </div>
+            <div class="chips-atalhos-cap">
+              <button type="button" class="chip-sm active" id="chip-cap-0" onclick="definirCapacidade(0)">Todas</button>
+              <button type="button" class="chip-sm" id="chip-cap-30" onclick="definirCapacidade(30)">30+</button>
+              <button type="button" class="chip-sm" id="chip-cap-50" onclick="definirCapacidade(50)">50+</button>
+              <button type="button" class="chip-sm" id="chip-cap-80" onclick="definirCapacidade(80)">80+</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Barra de Ações Rápidas e Busca de Salas -->
+      <div class="barra-acoes-grade">
+        <div class="acoes-esquerda">
+          <button type="button" class="btn-toggle-livres" id="btn-modo-livres" onclick="alternarModoApenasLivres()">
+            🚪 Apenas Salas Livres
+          </button>
+          <div class="busca-sala-wrapper">
+            <span class="icone-busca">🔍</span>
+            <input type="text" id="input-busca-sala" class="input-busca" placeholder="Buscar disciplina, docente ou texto..." autocomplete="off" spellcheck="false" oninput="aoBuscarSala(this.value)">
+            <button type="button" id="btn-limpar-busca" class="btn-limpar-busca" style="display: none;" onclick="limparBusca()" title="Limpar busca">&times;</button>
+          </div>
+          <button type="button" id="btn-toggle-colunas-match" class="btn-colunas-match" style="display: none;" onclick="alternarFocoColunasMatch()" title="Alternar entre ver apenas as colunas com resultado ou todas as colunas">
+            🎯 Apenas colunas com resultado
+          </button>
+        </div>
+        <div class="acoes-direita">
+          <button type="button" class="btn-reset" onclick="resetarTodosFiltros()">
+            🧹 Limpar Filtros
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Barra Informativa de Resultados -->
+    <div class="barra-resultados">
+      <div id="txt-contador-resultados">Carregando salas e horários...</div>
+    </div>
+
+    <!-- Área da Grade de Horários (Tabela) -->
+    <section class="grade-section">
+      
+      <!-- Estado de Carregamento (Loading Skeleton / Spinner) -->
+      <div id="estado-carregamento" class="loading-container">
+        <div class="spinner-grande"></div>
+        <h3>Conectando à grade oficial do SVGRAD...</h3>
+        <p>Lendo dados da fonte e estruturando horários em memória.</p>
+      </div>
+
+      <!-- Container da Tabela (com Scroll Horizontal e Vertical) -->
+      <div id="grade-tabela-container" class="grade-scroll-wrapper" style="display: none;">
+        <table id="tabela-grade" class="tabela-grade">
+          <thead id="grade-cabecalho">
+            <!-- Gerado dinamicamente no Passo 2 e 3 -->
+          </thead>
+          <tbody id="grade-corpo">
+            <!-- Linhas de salas geradas dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mensagem quando nenhum resultado é encontrado -->
+      <div id="estado-vazio" class="empty-container" style="display: none;">
+        <div class="empty-icon">🔎</div>
+        <h3>Nenhuma sala encontrada com os filtros atuais</h3>
+        <p>Tente selecionar outro dia, relaxar a faixa de horários ou desmarcar a opção "Apenas Salas Livres".</p>
+        <button type="button" class="btn-primary-outline" onclick="resetarTodosFiltros()">Ver Todas as Salas</button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Rodapé Discreto -->
+  <footer class="app-footer">
+    <span>Alocação Plus <span class="badge-versao"><?= APP_FULL_VERSION ?></span> • Escola de Engenharia de São Carlos (EESC-USP)</span>
+    <span>Consultas diretas: Graduação (Jupiterweb ↗) • Pós-Graduação (Janus ↗)</span>
+  </footer>
+
+  <!-- Container de Notificações Toast -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Inclusão do JavaScript Modular -->
+  <?!= include('scripts'); ?>
+</body>
+</html>

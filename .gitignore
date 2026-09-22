@@ -1,0 +1,40 @@
+# ==============================================================================
+# Git Ignore - Alocação Plus (EESC-USP)
+# ==============================================================================
+
+# Segurança e Credenciais OAuth Google
+credentials.json
+client_secret*.json
+token*.json
+*.key
+*.pem
+.gas-config.json
+.clasp.json
+
+# Ambientes e caches Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+env/
+venv/
+.venv/
+
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editores e IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backups locais manuais e temporários
+backup/
+*.bak
+*.tmp

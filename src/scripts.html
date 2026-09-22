@@ -1,0 +1,1177 @@
+<script>
+  /**
+   * ScriptJs.html - Lógica Frontend do Alocação Plus Web App
+   * Executado diretamente no navegador de cada usuário.
+   */
+
+  // Estado Global dos Filtros no Navegador do Usuário
+  const estadoApp = {
+    carregando: true,
+    dadosBrutos: null,       // Matriz e metadados recebidos do Backend
+    diasSelecionados: new Set(['todos']),
+    blocosSelecionados: new Set(['todos']),
+    salasSelecionadas: new Set(['todas']),
+    horaInicioMin: null,     // em minutos a partir de 00:00 (ex: 480 = 08:00)
+    horaFimMin: null,        // em minutos a partir de 00:00 (ex: 600 = 10:00)
+    capacidadeMin: 0,
+    apenasLivres: false,
+    buscaSala: '',
+    focarColunasMatch: true,
+    horariosInicioDisponiveis: [],
+    horariosFimDisponiveis: []
+  };
+
+  const MAPA_DIAS_SEMANA = {
+    0: { chave: 'seg', label: 'Segunda-feira (Hoje é Domingo)' },
+    1: { chave: 'seg', label: 'Segunda-feira' },
+    2: { chave: 'ter', label: 'Terça-feira' },
+    3: { chave: 'qua', label: 'Quarta-feira' },
+    4: { chave: 'qui', label: 'Quinta-feira' },
+    5: { chave: 'sex', label: 'Sexta-feira' },
+    6: { chave: 'sab', label: 'Sábado' }
+  };
+
+  const TODOS_OS_DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+  // --------------------------------------------------------------------------
+  // Inicialização ao carregar a página
+  // --------------------------------------------------------------------------
+  window.addEventListener('DOMContentLoaded', function() {
+    configurarIndicadorHoje();
+    carregarDadosDoBackend();
+  });
+
+  function configurarIndicadorHoje() {
+    const diaNum = new Date().getDay();
+    const infoHoje = MAPA_DIAS_SEMANA[diaNum] || MAPA_DIAS_SEMANA[1];
+    const lblHoje = document.getElementById('label-hoje-info');
+    if (lblHoje) {
+      lblHoje.textContent = infoHoje.label;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Comunicação com o Backend via google.script.run
+  // --------------------------------------------------------------------------
+  function carregarDadosDoBackend(forcarAtualizacao = false) {
+    if (!estadoApp.dadosBrutos) {
+      exibirCarregando(true);
+    }
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      console.warn('Ambiente de desenvolvimento local detectado (sem google.script.run).');
+      exibirErroCarregamento('Ambiente fora do Google Apps Script. Publique como Web App para carregar os dados.');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(aoReceberDadosGradeSucesso)
+      .withFailureHandler(aoFalharCarregamentoGrade)
+      .obterDadosGradeWeb(forcarAtualizacao);
+  }
+
+  function solicitarRecarregarDados() {
+    const btn = document.getElementById('btn-recarregar-dados');
+    if (btn) {
+      btn.textContent = '⏳ Sincronizando...';
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+    }
+    carregarDadosDoBackend(true);
+  }
+
+  function aoReceberDadosGradeSucesso(resposta) {
+    try {
+      const btn = document.getElementById('btn-recarregar-dados');
+      if (btn) {
+        btn.textContent = '🔄 Atualizar Dados';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+
+      if (!resposta || !resposta.sucesso) {
+        const msgErro = resposta ? resposta.msg : 'Resposta vazia do servidor.';
+        exibirErroCarregamento(msgErro);
+        exibirToast('Falha na Sincronização', msgErro, 'erro');
+        return;
+      }
+
+      const eraRecarregamentoManual = (estadoApp.dadosBrutos !== null);
+      estadoApp.dadosBrutos = resposta.dados;
+      estadoApp.carregando = false;
+
+      // Atualiza label de sincronização
+      const lblSync = document.getElementById('txt-ultima-sincronizacao');
+      if (lblSync && resposta.dados.timestamp) {
+        lblSync.textContent = 'Sincronizado: ' + resposta.dados.timestamp;
+      }
+
+      // Inicializa controles baseados nos dados recebidos
+      inicializarControlesComDados(resposta.dados);
+
+      // Renderiza a grade completa
+      renderizarGrade();
+
+      // Se foi uma solicitação manual, exibe a notificação Toast de sucesso
+      if (eraRecarregamentoManual) {
+        exibirToast(
+          'Sincronização Concluída',
+          `Grade oficial do SVGRAD sincronizada com sucesso (${resposta.dados.timestamp}).`,
+          'sucesso'
+        );
+      }
+    } catch (err) {
+      console.error('Erro ao processar dados da grade:', err);
+    } finally {
+      exibirCarregando(false);
+    }
+  }
+
+  function aoFalharCarregamentoGrade(erro) {
+    const btn = document.getElementById('btn-recarregar-dados');
+    if (btn) {
+      btn.textContent = '🔄 Atualizar Dados';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+    const msg = erro.message || 'Erro de comunicação com o servidor Google Apps Script.';
+    exibirToast('Erro de Conexão', msg, 'erro');
+    if (!estadoApp.dadosBrutos) {
+      exibirErroCarregamento(msg);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Notificações Toast do Sistema
+  // --------------------------------------------------------------------------
+  function exibirToast(titulo, mensagem, tipo = 'sucesso', duracaoMs = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const icones = {
+      sucesso: '✅',
+      erro: '❌',
+      info: 'ℹ️'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    toast.innerHTML = `
+      <span class="toast-icone">${icones[tipo] || 'ℹ️'}</span>
+      <div class="toast-corpo">
+        <div class="toast-titulo">${titulo}</div>
+        <div class="toast-mensagem">${mensagem}</div>
+      </div>
+      <button type="button" class="toast-fechar" aria-label="Fechar">&times;</button>
+    `;
+
+    const fecharBtn = toast.querySelector('.toast-fechar');
+    const removerToast = () => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 260);
+    };
+
+    fecharBtn.onclick = (e) => {
+      e.stopPropagation();
+      removerToast();
+    };
+
+    toast.onclick = removerToast;
+
+    container.appendChild(toast);
+
+    // Anima a entrada suave
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    if (duracaoMs > 0) {
+      setTimeout(() => {
+        removerToast();
+      }, duracaoMs);
+    }
+  }
+
+  function exibirCarregando(mostrar) {
+    const elLoad = document.getElementById('estado-carregamento');
+    const elTab = document.getElementById('grade-tabela-container');
+    const elVazio = document.getElementById('estado-vazio');
+
+    if (mostrar) {
+      if (elLoad) elLoad.style.display = 'flex';
+      if (elTab) elTab.style.display = 'none';
+      if (elVazio) elVazio.style.display = 'none';
+    } else {
+      if (elLoad) elLoad.style.display = 'none';
+    }
+  }
+
+  function exibirErroCarregamento(mensagem) {
+    exibirCarregando(false);
+    const elVazio = document.getElementById('estado-vazio');
+    const elTab = document.getElementById('grade-tabela-container');
+    if (elTab) elTab.style.display = 'none';
+    if (elVazio) {
+      elVazio.style.display = 'flex';
+      elVazio.querySelector('h3').textContent = 'Erro ao carregar os dados';
+      elVazio.querySelector('p').textContent = mensagem;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Inicialização de Filtros Dinâmicos (Blocos, Horários e Capacidade)
+  // --------------------------------------------------------------------------
+  function inicializarControlesComDados(dados) {
+    // 1. Popula Blocos Dinâmicos
+    popularChipsBlocos(dados.blocos || []);
+
+    // 2. Popula Dropdowns de Horários
+    popularSelectsHorarios(dados.estruturaHorarios || {});
+
+    // 3. Ajusta limite de capacidade
+    configurarLimiteCapacidade(dados.salas || []);
+  }
+
+  function popularChipsBlocos(blocos) {
+    const container = document.getElementById('container-blocos');
+    if (!container) return;
+
+    // Mantém o chip "Todos os Blocos" e insere os novos
+    container.innerHTML = '<button type="button" class="chip active" data-bloco="todos" onclick="alternarBloco(\'todos\')">Todos os Blocos</button>';
+
+    blocos.forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip';
+      btn.dataset.bloco = b;
+      btn.textContent = b;
+      btn.onclick = () => alternarBloco(b);
+      container.appendChild(btn);
+    });
+  }
+
+  function atualizarChipsSalas(salasElegiveis) {
+    const container = document.getElementById('container-salas');
+    const badge = document.getElementById('badge-salas-resumo');
+    if (!container) return;
+
+    // Preserva rolagem caso o usuário esteja navegando na lista de chips
+    const scrollAnterior = container.scrollTop;
+
+    // Extrai lista única de nomes de salas elegíveis pelos outros filtros
+    const nomesElegiveis = [...new Set(salasElegiveis.map(item => item.sala.nome).filter(Boolean))];
+
+    // Valida seleção atual contra as salas elegíveis (remove salas que não atendem mais aos outros filtros)
+    if (!estadoApp.salasSelecionadas.has('todas')) {
+      for (const s of estadoApp.salasSelecionadas) {
+        if (!nomesElegiveis.includes(s)) {
+          estadoApp.salasSelecionadas.delete(s);
+        }
+      }
+      if (estadoApp.salasSelecionadas.size === 0 || estadoApp.salasSelecionadas.size === nomesElegiveis.length) {
+        estadoApp.salasSelecionadas.clear();
+        estadoApp.salasSelecionadas.add('todas');
+      }
+    }
+
+    // Atualiza badge de contagem
+    if (badge) {
+      if (nomesElegiveis.length === 0) {
+        badge.textContent = '0 disponíveis';
+      } else if (estadoApp.salasSelecionadas.has('todas')) {
+        badge.textContent = `Todas (${nomesElegiveis.length})`;
+      } else {
+        badge.textContent = `${estadoApp.salasSelecionadas.size} de ${nomesElegiveis.length}`;
+      }
+    }
+
+    // Limpa container e recria os chips apenas com as salas elegíveis
+    container.innerHTML = '';
+
+    const todasAtivo = estadoApp.salasSelecionadas.has('todas');
+    const btnTodas = document.createElement('button');
+    btnTodas.type = 'button';
+    btnTodas.className = 'chip' + (todasAtivo ? ' active' : '');
+    btnTodas.dataset.sala = 'todas';
+    btnTodas.textContent = 'Todas as Salas';
+    btnTodas.onclick = () => alternarSala('todas');
+    container.appendChild(btnTodas);
+
+    if (nomesElegiveis.length === 0) {
+      const spanVazio = document.createElement('span');
+      spanVazio.style.cssText = 'font-size: 11px; color: #94a3b8; padding: 4px 6px; font-style: italic;';
+      spanVazio.textContent = 'Nenhuma sala com os filtros acima';
+      container.appendChild(spanVazio);
+    } else {
+      nomesElegiveis.forEach(nome => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const ativo = !todasAtivo && estadoApp.salasSelecionadas.has(nome);
+        btn.className = 'chip' + (ativo ? ' active' : '');
+        btn.dataset.sala = nome;
+        btn.textContent = nome;
+        btn.onclick = () => alternarSala(nome);
+        container.appendChild(btn);
+      });
+    }
+
+    container.scrollTop = scrollAnterior;
+  }
+
+  function popularSelectsHorarios(estrutura) {
+    const selIni = document.getElementById('sel-hora-inicio');
+    const selFim = document.getElementById('sel-hora-fim');
+    if (!selIni || !selFim || !estrutura.listaSlots) return;
+
+    const mapaIni = {};
+    const mapaFim = {};
+
+    estrutura.listaSlots.forEach(s => {
+      if (s.horaInicioMin !== null && !mapaIni[s.horaInicioMin]) {
+        mapaIni[s.horaInicioMin] = s.textoInicio || s.label;
+      }
+      if (s.horaFimMin !== null && !mapaFim[s.horaFimMin]) {
+        mapaFim[s.horaFimMin] = s.textoFim || s.label;
+      }
+    });
+
+    estadoApp.horariosInicioDisponiveis = Object.keys(mapaIni).map(Number).sort((a,b) => a - b).map(min => ({
+      min: min,
+      label: mapaIni[min]
+    }));
+
+    estadoApp.horariosFimDisponiveis = Object.keys(mapaFim).map(Number).sort((a,b) => a - b).map(min => ({
+      min: min,
+      label: mapaFim[min]
+    }));
+
+    atualizarOpcoesDropdownsHorarios('ambos');
+  }
+
+  function atualizarOpcoesDropdownsHorarios(origem) {
+    const selIni = document.getElementById('sel-hora-inicio');
+    const selFim = document.getElementById('sel-hora-fim');
+    if (!selIni || !selFim) return;
+
+    const valIni = selIni.value;
+    const valFim = selFim.value;
+    const iniNum = (valIni !== 'todos') ? parseInt(valIni, 10) : null;
+    const fimNum = (valFim !== 'todos') ? parseInt(valFim, 10) : null;
+
+    if (origem === 'inicio' || origem === 'ambos') {
+      const optsFim = (iniNum !== null)
+        ? estadoApp.horariosFimDisponiveis.filter(o => o.min > iniNum)
+        : estadoApp.horariosFimDisponiveis;
+
+      selFim.innerHTML = '<option value="todos">Todos os horários</option>';
+      optsFim.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.min;
+        opt.textContent = o.label;
+        selFim.appendChild(opt);
+      });
+      if (valFim !== 'todos' && selFim.querySelector(`option[value="${valFim}"]`)) {
+        selFim.value = valFim;
+      }
+    }
+
+    if (origem === 'fim' || origem === 'ambos') {
+      const optsIni = (fimNum !== null)
+        ? estadoApp.horariosInicioDisponiveis.filter(o => o.min < fimNum)
+        : estadoApp.horariosInicioDisponiveis;
+
+      selIni.innerHTML = '<option value="todos">Todos os horários</option>';
+      optsIni.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.min;
+        opt.textContent = o.label;
+        selIni.appendChild(opt);
+      });
+      if (valIni !== 'todos' && selIni.querySelector(`option[value="${valIni}"]`)) {
+        selIni.value = valIni;
+      }
+    }
+  }
+
+  function configurarLimiteCapacidade(salas) {
+    let maxCap = 0;
+    salas.forEach(s => {
+      const c = parseInt(String(s.capacidade).replace(/\D/g, ''), 10) || 0;
+      if (c > maxCap) maxCap = c;
+    });
+    if (maxCap === 0) maxCap = 100;
+
+    const inp = document.getElementById('input-capacidade-min');
+    if (inp) {
+      inp.max = maxCap;
+      inp.placeholder = `Ex: 40 (máx: ${maxCap})`;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Interações de Filtros
+  // --------------------------------------------------------------------------
+  function alternarDia(dia) {
+    if (dia === 'todos') {
+      estadoApp.diasSelecionados.clear();
+      estadoApp.diasSelecionados.add('todos');
+    } else {
+      estadoApp.diasSelecionados.delete('todos');
+      if (estadoApp.diasSelecionados.has(dia)) {
+        estadoApp.diasSelecionados.delete(dia);
+      } else {
+        estadoApp.diasSelecionados.add(dia);
+      }
+
+      if (estadoApp.diasSelecionados.size === 0 || estadoApp.diasSelecionados.size === TODOS_OS_DIAS.length) {
+        estadoApp.diasSelecionados.clear();
+        estadoApp.diasSelecionados.add('todos');
+      }
+    }
+
+    // Atualiza visual dos chips
+    document.querySelectorAll('#container-dias .chip').forEach(btn => {
+      const d = btn.dataset.dia;
+      if (estadoApp.diasSelecionados.has(d)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function selecionarHoje() {
+    const diaNum = new Date().getDay();
+    const infoHoje = MAPA_DIAS_SEMANA[diaNum] || MAPA_DIAS_SEMANA[1];
+    estadoApp.diasSelecionados.clear();
+    estadoApp.diasSelecionados.add(infoHoje.chave);
+
+    document.querySelectorAll('#container-dias .chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.dia === infoHoje.chave);
+    });
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function alternarBloco(bloco) {
+    if (bloco === 'todos') {
+      estadoApp.blocosSelecionados.clear();
+      estadoApp.blocosSelecionados.add('todos');
+    } else {
+      estadoApp.blocosSelecionados.delete('todos');
+      if (estadoApp.blocosSelecionados.has(bloco)) {
+        estadoApp.blocosSelecionados.delete(bloco);
+      } else {
+        estadoApp.blocosSelecionados.add(bloco);
+      }
+
+      const totalBlocos = (estadoApp.dadosBrutos && estadoApp.dadosBrutos.blocos) ? estadoApp.dadosBrutos.blocos.length : 0;
+      if (estadoApp.blocosSelecionados.size === 0 || estadoApp.blocosSelecionados.size === totalBlocos) {
+        estadoApp.blocosSelecionados.clear();
+        estadoApp.blocosSelecionados.add('todos');
+      }
+    }
+
+    // Atualiza visual
+    document.querySelectorAll('#container-blocos .chip').forEach(btn => {
+      const b = btn.dataset.bloco;
+      btn.classList.toggle('active', estadoApp.blocosSelecionados.has(b));
+    });
+
+    const badge = document.getElementById('badge-blocos-resumo');
+    if (badge) {
+      badge.textContent = estadoApp.blocosSelecionados.has('todos')
+        ? 'Todos'
+        : `${estadoApp.blocosSelecionados.size} selecionado(s)`;
+    }
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function alternarSala(sala) {
+    if (sala === 'todas') {
+      estadoApp.salasSelecionadas.clear();
+      estadoApp.salasSelecionadas.add('todas');
+    } else {
+      estadoApp.salasSelecionadas.delete('todas');
+      if (estadoApp.salasSelecionadas.has(sala)) {
+        estadoApp.salasSelecionadas.delete(sala);
+      } else {
+        estadoApp.salasSelecionadas.add(sala);
+      }
+
+      if (estadoApp.salasSelecionadas.size === 0) {
+        estadoApp.salasSelecionadas.clear();
+        estadoApp.salasSelecionadas.add('todas');
+      }
+    }
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function aoAlterarHorario(isInicio) {
+    atualizarOpcoesDropdownsHorarios(isInicio ? 'inicio' : 'fim');
+
+    const valIni = document.getElementById('sel-hora-inicio').value;
+    const valFim = document.getElementById('sel-hora-fim').value;
+
+    estadoApp.horaInicioMin = (valIni !== 'todos') ? parseInt(valIni, 10) : null;
+    estadoApp.horaFimMin = (valFim !== 'todos') ? parseInt(valFim, 10) : null;
+
+    atualizarBadgeHorarios();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function encontrarMinutoMaisProximo(lista, alvoMin) {
+    if (!lista || lista.length === 0) return null;
+    let melhor = lista[0].min;
+    let menorDiff = Math.abs(melhor - alvoMin);
+
+    for (let i = 1; i < lista.length; i++) {
+      const val = lista[i].min;
+      const diff = Math.abs(val - alvoMin);
+      if (diff < menorDiff) {
+        melhor = val;
+        menorDiff = diff;
+      }
+    }
+    return melhor;
+  }
+
+  function selecionarHorarioAgora() {
+    // 1. Ativa o dia da semana correspondente para hoje
+    const diaNum = new Date().getDay();
+    const infoHoje = MAPA_DIAS_SEMANA[diaNum] || MAPA_DIAS_SEMANA[1];
+    estadoApp.diasSelecionados.clear();
+    estadoApp.diasSelecionados.add(infoHoje.chave);
+
+    document.querySelectorAll('#container-dias .chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.dia === infoHoje.chave);
+    });
+
+    // 2. Determina o bloco de aula mais adequado à hora atual
+    const agora = new Date();
+    const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+
+    // Blocos de aula padrão mais frequentes na EESC / USP
+    const BLOCOS_AULA_EESC = [
+      { inicio: 8 * 60, fim: 10 * 60 },           // 08:00 - 10:00
+      { inicio: 10 * 60 + 20, fim: 12 * 60 },      // 10:20 - 12:00
+      { inicio: 14 * 60 + 20, fim: 16 * 60 + 10 }, // 14:20 - 16:10
+      { inicio: 16 * 60 + 20, fim: 18 * 60 },      // 16:20 - 18:00
+      { inicio: 19 * 60, fim: 20 * 60 + 40 },      // 19:00 - 20:40
+      { inicio: 20 * 60 + 50, fim: 22 * 60 + 30 }  // 20:50 - 22:30
+    ];
+
+    // Procura se estamos dentro de algum bloco neste momento
+    let blocoAlvo = BLOCOS_AULA_EESC.find(b => minutosAgora >= b.inicio && minutosAgora < b.fim);
+
+    // Se estiver em intervalo entre aulas ou antes da 1ª aula matutina, foca no próximo bloco
+    if (!blocoAlvo) {
+      blocoAlvo = BLOCOS_AULA_EESC.find(b => b.inicio > minutosAgora);
+    }
+
+    // Se for tarde da noite (após último bloco), foca no último bloco do dia
+    if (!blocoAlvo) {
+      blocoAlvo = BLOCOS_AULA_EESC[BLOCOS_AULA_EESC.length - 1];
+    }
+
+    // 3. Ajusta o select de Início (sel-hora-inicio)
+    const selIni = document.getElementById('sel-hora-inicio');
+    const selFim = document.getElementById('sel-hora-fim');
+
+    if (selIni && estadoApp.horariosInicioDisponiveis.length > 0) {
+      const iniMaisProximo = encontrarMinutoMaisProximo(estadoApp.horariosInicioDisponiveis, blocoAlvo.inicio);
+      if (iniMaisProximo !== null) {
+        selIni.value = iniMaisProximo;
+        estadoApp.horaInicioMin = iniMaisProximo;
+      }
+    }
+
+    // Atualiza opções disponíveis no dropdown de término
+    atualizarOpcoesDropdownsHorarios('inicio');
+
+    // 4. Ajusta o select de Término (sel-hora-fim) delimitando o intervalo do bloco
+    if (selFim && estadoApp.horariosFimDisponiveis.length > 0) {
+      const optsValidasFim = (estadoApp.horaInicioMin !== null)
+        ? estadoApp.horariosFimDisponiveis.filter(o => o.min > estadoApp.horaInicioMin)
+        : estadoApp.horariosFimDisponiveis;
+
+      const fimMaisProximo = encontrarMinutoMaisProximo(optsValidasFim, blocoAlvo.fim);
+      if (fimMaisProximo !== null) {
+        selFim.value = fimMaisProximo;
+        estadoApp.horaFimMin = fimMaisProximo;
+      }
+    }
+
+    atualizarOpcoesDropdownsHorarios('fim');
+    atualizarBadgeHorarios();
+
+    // 5. Aplica a visualização atualizada
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function definirQualquerHorario() {
+    document.getElementById('sel-hora-inicio').value = 'todos';
+    document.getElementById('sel-hora-fim').value = 'todos';
+    estadoApp.horaInicioMin = null;
+    estadoApp.horaFimMin = null;
+    atualizarOpcoesDropdownsHorarios('ambos');
+    atualizarBadgeHorarios();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function atualizarBadgeHorarios() {
+    const badge = document.getElementById('badge-horario-resumo');
+    if (!badge) return;
+    if (estadoApp.horaInicioMin === null && estadoApp.horaFimMin === null) {
+      badge.textContent = 'Todos';
+    } else {
+      const tIni = estadoApp.horaInicioMin !== null ? minParaTexto(estadoApp.horaInicioMin) : '';
+      const tFim = estadoApp.horaFimMin !== null ? minParaTexto(estadoApp.horaFimMin) : '';
+      badge.textContent = `${tIni || 'Início'} ➔ ${tFim || 'Fim'}`;
+    }
+  }
+
+  function minParaTexto(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}`;
+  }
+
+  function definirCapacidade(valor) {
+    const val = parseInt(valor, 10) || 0;
+    estadoApp.capacidadeMin = val;
+    const inp = document.getElementById('input-capacidade-min');
+    if (inp) inp.value = val > 0 ? val : '';
+
+    document.querySelectorAll('.chips-atalhos-cap .chip-sm').forEach(btn => {
+      btn.classList.toggle('active', btn.id === `chip-cap-${val}`);
+    });
+
+    const badge = document.getElementById('badge-capacidade-resumo');
+    if (badge) badge.textContent = val > 0 ? (val === 1 ? `${val} lugar` : `${val}+ lugares`) : 'Todas';
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function aoDigitarCapacidade(valor) {
+    const val = parseInt(valor, 10) || 0;
+    estadoApp.capacidadeMin = val;
+
+    document.querySelectorAll('.chips-atalhos-cap .chip-sm').forEach(btn => {
+      btn.classList.toggle('active', btn.id === `chip-cap-${val}`);
+    });
+
+    const badge = document.getElementById('badge-capacidade-resumo');
+    if (badge) badge.textContent = val > 0 ? (val === 1 ? `${val} lugar` : `${val}+ lugares`) : 'Todas';
+
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function alternarModoApenasLivres() {
+    const temBusca = Boolean(estadoApp.buscaSala && estadoApp.buscaSala.trim());
+    if (temBusca) return; // Desabilitado quando houver busca textual ativa
+
+    estadoApp.apenasLivres = !estadoApp.apenasLivres;
+    const btn = document.getElementById('btn-modo-livres');
+    if (btn) btn.classList.toggle('ativo', estadoApp.apenasLivres);
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function atualizarEstadoBotaoLivres() {
+    const btnLivres = document.getElementById('btn-modo-livres');
+    if (!btnLivres) return;
+    const temBusca = Boolean(estadoApp.buscaSala && estadoApp.buscaSala.trim());
+    btnLivres.disabled = temBusca;
+    if (temBusca) {
+      if (estadoApp.apenasLivres) {
+        estadoApp.apenasLivres = false;
+        btnLivres.classList.remove('ativo');
+      }
+      btnLivres.title = 'Desabilitado durante a busca textual';
+    } else {
+      btnLivres.title = '';
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Normalização e Busca Inteligente (Disciplinas, Docentes, Texto e Salas)
+  // --------------------------------------------------------------------------
+  function normalizarTexto(txt) {
+    if (!txt) return '';
+    return String(txt)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function obterCelulaEfetiva(linhaCels, cIdx) {
+    if (!linhaCels) return null;
+    const cel = linhaCels[cIdx];
+    if (!cel) return null;
+    if (!cel.c) return cel;
+    // Célula coberta por mesclagem: localiza a célula de origem
+    for (let k = cIdx - 1; k >= 0; k--) {
+      const celOrigem = linhaCels[k];
+      if (celOrigem && !celOrigem.c) {
+        if (celOrigem.cs && (k + celOrigem.cs > cIdx)) {
+          return celOrigem;
+        }
+        break;
+      }
+    }
+    return null;
+  }
+
+  function celulaCorrespondeABusca(cel, tokens) {
+    if (!cel || !cel.t || !tokens || tokens.length === 0) return false;
+    if (!cel._tNorm) {
+      cel._tNorm = normalizarTexto(cel.t);
+    }
+    const texto = cel._tNorm;
+    return tokens.every(t => texto.includes(t));
+  }
+
+  function salaCorrespondeABusca(sala, linhaCels, slotsAtivos, tokens, termoCompletoNorm) {
+    if (!tokens || tokens.length === 0) return true;
+
+    // 1. Nome da sala (ex: "C-01", "Anfiteatro")
+    if (!sala._nomeNorm) {
+      sala._nomeNorm = normalizarTexto(sala.nome);
+    }
+    if (sala._nomeNorm.includes(termoCompletoNorm) || tokens.every(t => sala._nomeNorm.includes(t))) {
+      return true;
+    }
+
+    // 2. Verifica se alguma aula/célula nos slots ativos atende à busca
+    for (let i = 0; i < slotsAtivos.length; i++) {
+      const cIdx = slotsAtivos[i].cIdx;
+      const celEfetiva = obterCelulaEfetiva(linhaCels, cIdx);
+      if (celEfetiva && celEfetiva.t) {
+        if (celulaCorrespondeABusca(celEfetiva, tokens)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function alternarFocoColunasMatch() {
+    estadoApp.focarColunasMatch = !estadoApp.focarColunasMatch;
+    atualizarBotaoColunasMatch();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function atualizarBotaoColunasMatch(podeFocar = true) {
+    const btn = document.getElementById('btn-toggle-colunas-match');
+    if (!btn) return;
+    const temBusca = Boolean(estadoApp.buscaSala && estadoApp.buscaSala.trim());
+    if (!temBusca || !podeFocar) {
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = 'inline-flex';
+    if (estadoApp.focarColunasMatch) {
+      btn.className = 'btn-colunas-match';
+      btn.innerHTML = '🎯 Apenas colunas com resultado';
+      btn.title = 'Clique para ver todas as colunas da grade';
+    } else {
+      btn.className = 'btn-colunas-match inativo';
+      btn.innerHTML = '👁️ Todas as colunas';
+      btn.title = 'Clique para focar apenas nas colunas com resultado';
+    }
+  }
+
+  function aoBuscarSala(termo) {
+    estadoApp.buscaSala = String(termo || '');
+    const btnLimpar = document.getElementById('btn-limpar-busca');
+    if (btnLimpar) {
+      btnLimpar.style.display = estadoApp.buscaSala.trim() ? 'block' : 'none';
+    }
+    atualizarEstadoBotaoLivres();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function limparBusca() {
+    estadoApp.buscaSala = '';
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.value = '';
+      inpBusca.focus();
+    }
+    const btnLimpar = document.getElementById('btn-limpar-busca');
+    if (btnLimpar) {
+      btnLimpar.style.display = 'none';
+    }
+    const btnColunas = document.getElementById('btn-toggle-colunas-match');
+    if (btnColunas) {
+      btnColunas.style.display = 'none';
+    }
+    atualizarEstadoBotaoLivres();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function resetarTodosFiltros() {
+    estadoApp.diasSelecionados.clear();
+    estadoApp.diasSelecionados.add('todos');
+    estadoApp.blocosSelecionados.clear();
+    estadoApp.blocosSelecionados.add('todos');
+    estadoApp.salasSelecionadas.clear();
+    estadoApp.salasSelecionadas.add('todas');
+    estadoApp.horaInicioMin = null;
+    estadoApp.horaFimMin = null;
+    estadoApp.capacidadeMin = 0;
+    estadoApp.apenasLivres = false;
+    estadoApp.buscaSala = '';
+    estadoApp.focarColunasMatch = true;
+
+    // Reseta elementos visuais
+    document.querySelectorAll('#container-dias .chip').forEach(b => b.classList.toggle('active', b.dataset.dia === 'todos'));
+    document.querySelectorAll('#container-blocos .chip').forEach(b => b.classList.toggle('active', b.dataset.bloco === 'todos'));
+    document.querySelectorAll('#container-salas .chip').forEach(b => b.classList.toggle('active', b.dataset.sala === 'todas'));
+    const badgeSalas = document.getElementById('badge-salas-resumo');
+    if (badgeSalas) badgeSalas.textContent = 'Todas';
+    const badgeBlocos = document.getElementById('badge-blocos-resumo');
+    if (badgeBlocos) badgeBlocos.textContent = 'Todos';
+    definirQualquerHorario();
+    definirCapacidade(0);
+    const btnLivres = document.getElementById('btn-modo-livres');
+    if (btnLivres) {
+      btnLivres.classList.remove('ativo');
+      btnLivres.disabled = false;
+      btnLivres.title = '';
+    }
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) inpBusca.value = '';
+    const btnLimpar = document.getElementById('btn-limpar-busca');
+    if (btnLimpar) btnLimpar.style.display = 'none';
+    const btnColunas = document.getElementById('btn-toggle-colunas-match');
+    if (btnColunas) btnColunas.style.display = 'none';
+
+    atualizarEstadoBotaoLivres();
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  // --------------------------------------------------------------------------
+  // Renderização da Grade e Aplicação de Filtros Reativa no Navegador
+  // --------------------------------------------------------------------------
+  function renderizarGrade() {
+    aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  function aplicarFiltrosEAtualizarVisualizacao() {
+    if (!estadoApp.dadosBrutos) return;
+
+    const dados = estadoApp.dadosBrutos;
+    const todosSlots = dados.slots || [];
+    const todasSalas = dados.salas || [];
+    const matrizGrade = dados.grade || [];
+
+    // 1. Determina quais slots de horários estão inicialmente elegíveis (Filtros de Dias e Horário)
+    const temFiltroDias = !estadoApp.diasSelecionados.has('todos');
+    const hIni = estadoApp.horaInicioMin;
+    const hFim = estadoApp.horaFimMin;
+
+    const slotsIniciais = [];
+
+    todosSlots.forEach((slot, cIdx) => {
+      // Filtro de dia
+      if (temFiltroDias && !estadoApp.diasSelecionados.has(slot.dia)) {
+        return;
+      }
+
+      // Filtro de horário
+      if (hIni !== null || hFim !== null) {
+        if (slot.horaInicioMin !== null && slot.horaFimMin !== null) {
+          if (hIni !== null && slot.horaFimMin <= hIni) return;
+          if (hFim !== null && slot.horaInicioMin >= hFim) return;
+        } else {
+          return;
+        }
+      }
+
+      slotsIniciais.push({ slot: slot, cIdx: cIdx });
+    });
+
+    // 2. Parâmetros de Filtros de Bloco, Capacidade e Busca Textual
+    const temFiltroBlocos = !estadoApp.blocosSelecionados.has('todos');
+    const capMin = estadoApp.capacidadeMin;
+    const buscaLimpa = String(estadoApp.buscaSala || '').trim();
+    const termoBuscaNorm = normalizarTexto(buscaLimpa);
+    const tokensBusca = termoBuscaNorm.split(/\s+/).filter(Boolean);
+    const temBusca = tokensBusca.length > 0;
+    const apenasLivres = estadoApp.apenasLivres && !temBusca;
+
+    // 3. Foco em Colunas com Match (filtra colunas mostrando apenas as que têm match)
+    let slotsAtivos = slotsIniciais;
+    let colunasFocadas = false;
+    let temColunasComMatch = false;
+
+    if (temBusca) {
+      const colunasComMatch = new Set();
+
+      todasSalas.forEach((sala, rIdx) => {
+        if (temFiltroBlocos && !estadoApp.blocosSelecionados.has(sala.bloco)) return;
+        if (capMin > 0 && sala.capacidadeNum < capMin) return;
+
+        const linhaCels = matrizGrade[rIdx] || [];
+        for (let i = 0; i < slotsIniciais.length; i++) {
+          const cIdx = slotsIniciais[i].cIdx;
+          const celEfetiva = obterCelulaEfetiva(linhaCels, cIdx);
+          if (celEfetiva && celEfetiva.t && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
+            colunasComMatch.add(cIdx);
+          }
+        }
+      });
+
+      if (colunasComMatch.size > 0) {
+        temColunasComMatch = true;
+        if (estadoApp.focarColunasMatch !== false) {
+          slotsAtivos = slotsIniciais.filter(item => colunasComMatch.has(item.cIdx));
+          colunasFocadas = true;
+        }
+      }
+    }
+
+    // Atualiza a visibilidade e rótulo do botão de foco em colunas e estado do botão livres
+    atualizarBotaoColunasMatch(temColunasComMatch);
+    atualizarEstadoBotaoLivres();
+
+    // Agrupa slots ativos por dia para construir o cabeçalho superior
+    const mapaDiasAtivos = {};
+    slotsAtivos.forEach(item => {
+      const d = item.slot.dia;
+      if (!mapaDiasAtivos[d]) {
+        const infoDia = (dados.dias || []).find(x => x.chave === d) || { nome: d };
+        mapaDiasAtivos[d] = {
+          chave: d,
+          nome: infoDia.nome,
+          slots: []
+        };
+      }
+      mapaDiasAtivos[d].slots.push(item);
+    });
+
+    // 4. Filtra as salas que satisfazem OS OUTROS FILTROS (Bloco, Capacidade, Busca Textual e Salas Livres)
+    const salasElegiveis = [];
+
+    todasSalas.forEach((sala, rIdx) => {
+      // Filtro de bloco
+      if (temFiltroBlocos && !estadoApp.blocosSelecionados.has(sala.bloco)) {
+        return;
+      }
+
+      // Filtro de capacidade mínima
+      if (capMin > 0 && sala.capacidadeNum < capMin) {
+        return;
+      }
+
+      const linhaCels = matrizGrade[rIdx] || [];
+
+      // Filtro de busca textual (disciplina, docente, conteúdo da célula ou nome da sala)
+      if (temBusca) {
+        if (!salaCorrespondeABusca(sala, linhaCels, slotsAtivos, tokensBusca, termoBuscaNorm)) {
+          return;
+        }
+      }
+
+      // Filtro "Apenas Salas Livres" nos slots ativos (respeitando dias e horários selecionados)
+      if (apenasLivres && slotsAtivos.length > 0) {
+        let ocupada = false;
+
+        for (let i = 0; i < slotsAtivos.length; i++) {
+          const cIdx = slotsAtivos[i].cIdx;
+          const celEfetiva = obterCelulaEfetiva(linhaCels, cIdx);
+          if (celEfetiva && celEfetiva.t && celEfetiva.t.trim() !== '') {
+            ocupada = true;
+            break;
+          }
+        }
+
+        if (ocupada) {
+          return;
+        }
+      }
+
+      salasElegiveis.push({ sala: sala, rIdx: rIdx });
+    });
+
+    // 5. Atualiza dinamicamente os chips da seção de Salas Específicas
+    // Exibe apenas as salas que satisfazem todos os outros filtros ativos
+    atualizarChipsSalas(salasElegiveis);
+
+    // 6. Aplica a seleção individual de salas sobre as salas elegíveis
+    const temFiltroSalas = !estadoApp.salasSelecionadas.has('todas');
+    const salasVisiveis = temFiltroSalas
+      ? salasElegiveis.filter(item => estadoApp.salasSelecionadas.has(item.sala.nome))
+      : salasElegiveis;
+
+    // 7. Atualiza os Contadores Informativos
+    const txtContador = document.getElementById('txt-contador-resultados');
+    if (txtContador) {
+      let infoBusca = '';
+      if (temBusca) {
+        if (colunasFocadas) {
+          infoBusca = ` • Filtro: "<strong>${escapeHtml(buscaLimpa)}</strong>" (focando ${slotsAtivos.length} de ${slotsIniciais.length} horários)`;
+        } else {
+          infoBusca = ` • Filtro: "<strong>${escapeHtml(buscaLimpa)}</strong>"`;
+        }
+      }
+      txtContador.innerHTML = `Exibindo <strong>${salasVisiveis.length}</strong> de ${todasSalas.length} salas • <strong>${slotsAtivos.length}</strong> horários visíveis${infoBusca}.`;
+    }
+
+    const containerTab = document.getElementById('grade-tabela-container');
+    const containerVazio = document.getElementById('estado-vazio');
+
+    if (salasVisiveis.length === 0 || slotsAtivos.length === 0) {
+      if (containerTab) containerTab.style.display = 'none';
+      if (containerVazio) {
+        containerVazio.style.display = 'flex';
+        if (slotsAtivos.length === 0) {
+          containerVazio.querySelector('h3').textContent = 'Nenhum horário selecionado';
+          containerVazio.querySelector('p').textContent = 'Selecione ao menos um dia da semana ou amplie a faixa de horários.';
+        } else if (temBusca) {
+          containerVazio.querySelector('h3').textContent = `Nenhuma sala encontrada para "${escapeHtml(buscaLimpa)}"`;
+          containerVazio.querySelector('p').textContent = 'Tente buscar por outra sigla, docente ou relaxar os filtros superiores de dia, bloco ou horário.';
+        } else {
+          containerVazio.querySelector('h3').textContent = 'Nenhuma sala encontrada com os filtros atuais';
+          containerVazio.querySelector('p').textContent = 'Tente relaxar os filtros de bloco, capacidade ou desmarcar "Apenas Salas Livres".';
+        }
+      }
+      return;
+    }
+
+    if (containerVazio) containerVazio.style.display = 'none';
+    if (containerTab) containerTab.style.display = 'block';
+
+    // 4. Renderiza o Cabeçalho (THEAD)
+    let theadHtml = '<tr>';
+    theadHtml += '<th class="col-fixa-sala" rowspan="2">Sala</th>';
+    theadHtml += '<th class="col-fixa-cap" rowspan="2">Lugares</th>';
+
+    const diasChaves = Object.keys(mapaDiasAtivos);
+
+    diasChaves.forEach((diaKey, dIdx) => {
+      const diaObj = mapaDiasAtivos[diaKey];
+      const diaClass = (dIdx % 2 === 0) ? 'dia-par' : 'dia-impar';
+      const ehUltimoDia = (dIdx === diasChaves.length - 1);
+      const bordaFim = !ehUltimoDia ? ' col-dia-fim' : '';
+      theadHtml += `<th colspan="${diaObj.slots.length}" class="th-dia-header ${diaClass}${bordaFim}">${diaObj.nome}</th>`;
+    });
+    theadHtml += '</tr><tr>';
+
+    slotsAtivos.forEach(item => {
+      const s = item.slot;
+      const dIdx = diasChaves.indexOf(s.dia);
+      const diaClass = (dIdx % 2 === 0) ? 'dia-par' : 'dia-impar';
+      const slotsDoDia = mapaDiasAtivos[s.dia]?.slots || [];
+      const ehUltimoSlotDoDia = (slotsDoDia[slotsDoDia.length - 1] === item);
+      const ehUltimoDia = (dIdx === diasChaves.length - 1);
+      const bordaFim = (ehUltimoSlotDoDia && !ehUltimoDia) ? ' col-dia-fim' : '';
+      theadHtml += `<th class="th-slot-header ${diaClass}${bordaFim}" title="${s.label || s.textoInicio}">${s.label || s.textoInicio}</th>`;
+    });
+    theadHtml += '</tr>';
+
+    document.getElementById('grade-cabecalho').innerHTML = theadHtml;
+
+    // 5. Renderiza o Corpo da Tabela (TBODY)
+    let tbodyHtml = '';
+
+    salasVisiveis.forEach(itemSala => {
+      const s = itemSala.sala;
+      const r = itemSala.rIdx;
+      const linhaCels = matrizGrade[r] || [];
+
+      tbodyHtml += `<tr class="linha-grade-sala" data-idx="${r}" data-bloco="${s.bloco}">`;
+      tbodyHtml += `<td class="col-fixa-sala" title="${s.nome}"><span class="txt-sala">${s.nome}</span></td>`;
+      tbodyHtml += `<td class="col-fixa-cap">${s.capacidade}</td>`;
+
+      let colIdxRelativo = 0;
+      while (colIdxRelativo < slotsAtivos.length) {
+        const itemSlot = slotsAtivos[colIdxRelativo];
+        const cOrig = itemSlot.cIdx;
+        const cel = linhaCels[cOrig];
+
+        // Se a célula está coberta por um merge que iniciou em um slot anterior que TAMBÉM está visível, pula
+        if (cel && cel.c) {
+          // Verifica se a célula que deu origem ao merge está visível nos slotsAtivos
+          let origemVisivel = false;
+          for (let k = colIdxRelativo - 1; k >= 0; k--) {
+            const prevColOrig = slotsAtivos[k].cIdx;
+            const prevCel = linhaCels[prevColOrig];
+            if (prevCel && !prevCel.c && prevCel.cs && (prevColOrig + prevCel.cs > cOrig)) {
+              origemVisivel = true;
+              break;
+            }
+          }
+          if (origemVisivel) {
+            colIdxRelativo++;
+            continue;
+          }
+        }
+
+        const celEfetiva = (cel && cel.t) ? cel : obterCelulaEfetiva(linhaCels, cOrig);
+        const temAula = Boolean(celEfetiva && celEfetiva.t);
+
+        // Calcula quantos slots visíveis consecutivos esta célula ocupa
+        let colspanVisivel = 1;
+        const celComMerge = (cel && cel.cs) ? cel : (celEfetiva && celEfetiva.cs ? celEfetiva : null);
+        if (celComMerge && celComMerge.cs > 1) {
+          const colFimOrig = (cel && cel.cs) ? (cOrig + cel.cs) : (linhaCels.indexOf(celEfetiva) + celEfetiva.cs);
+          for (let next = colIdxRelativo + 1; next < slotsAtivos.length; next++) {
+            if (slotsAtivos[next].cIdx < colFimOrig) {
+              colspanVisivel++;
+            } else {
+              break;
+            }
+          }
+        }
+
+        const csAttr = (colspanVisivel > 1) ? ` colspan="${colspanVisivel}"` : '';
+        const bgStyle = (celEfetiva && celEfetiva.bg) ? ` style="background-color: ${celEfetiva.bg};"` : '';
+        const aulaClass = temAula ? (celEfetiva.pos ? ' celula-aula celula-pos' : ' celula-aula') : '';
+
+        let destaqueClass = '';
+        if (temBusca && temAula && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
+          destaqueClass = ' celula-destacada-busca';
+        }
+
+        const conteudo = temAula ? (celEfetiva.h || celEfetiva.t || '') : '';
+
+        const slotInfo = itemSlot.slot;
+        const dIdx = diasChaves.indexOf(slotInfo.dia);
+        const diaClass = (dIdx % 2 === 0) ? 'dia-par' : 'dia-impar';
+        const slotsDoDia = mapaDiasAtivos[slotInfo.dia]?.slots || [];
+        const ultimoSlotDoDia = slotsDoDia[slotsDoDia.length - 1];
+        const slotFimCelula = slotsAtivos[colIdxRelativo + colspanVisivel - 1];
+        const ehFimDoDia = (slotFimCelula === ultimoSlotDoDia) && (dIdx < diasChaves.length - 1);
+        const bordaFim = ehFimDoDia ? ' col-dia-fim' : '';
+
+        tbodyHtml += `<td class="celula-grade ${diaClass}${bordaFim}${aulaClass}${destaqueClass}"${csAttr}${bgStyle}>${conteudo}</td>`;
+
+        colIdxRelativo += colspanVisivel;
+      }
+
+      tbodyHtml += '</tr>';
+    });
+
+    document.getElementById('grade-corpo').innerHTML = tbodyHtml;
+  }
+</script>
+
