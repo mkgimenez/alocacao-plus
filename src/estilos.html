@@ -165,20 +165,7 @@
     color: #104880;
   }
 
-  .btn-hoje {
-    padding: 4px 8px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .btn-hoje:hover {
-    background: var(--primary-hover);
-  }
-
+  .btn-hoje,
   .btn-agora {
     background: var(--accent-yellow);
     color: var(--accent-yellow-text);
@@ -186,9 +173,10 @@
     padding: 4px 8px;
     border-radius: 5px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
+  .btn-hoje:hover,
   .btn-agora:hover {
     background: #fde68a;
   }
@@ -777,6 +765,18 @@
 
   .tabela-grade tbody td.col-dia-fim {
     border-right: 2px solid #cbd5e1 !important;
+  }
+
+  /* --------------------------------------------------------------------------
+     Destaque Visual dos Cabeçalhos Atuais (Dia de Hoje e Horário Vigente)
+     -------------------------------------------------------------------------- */
+  .tabela-grade thead th.th-dia-header.dia-hoje-atual,
+  .tabela-grade thead th.th-slot-header.col-slot-atual {
+    background: var(--accent-yellow) !important;
+    color: var(--accent-yellow-text) !important;
+    border-right: 1px solid var(--accent-yellow-border) !important;
+    border-bottom: 1px solid var(--accent-yellow-border) !important;
+    font-weight: 700 !important;
   }
 
   /* Células com Aulas */

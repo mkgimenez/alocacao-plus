@@ -38,8 +38,20 @@
   // --------------------------------------------------------------------------
   window.addEventListener('DOMContentLoaded', function() {
     configurarIndicadorHoje();
+    iniciarMonitoramentoHorarioAtual();
     carregarDadosDoBackend();
   });
+
+  let timerAtualizacaoSlot = null;
+  function iniciarMonitoramentoHorarioAtual() {
+    if (timerAtualizacaoSlot) clearInterval(timerAtualizacaoSlot);
+    timerAtualizacaoSlot = setInterval(() => {
+      // Re-renderiza a grade periodicamente para manter o destaque do horário atual sincronizado com o relógio
+      if (estadoApp.dadosBrutos) {
+        renderizarGrade();
+      }
+    }, 60000);
+  }
 
   function configurarIndicadorHoje() {
     const diaNum = new Date().getDay();
@@ -871,6 +883,30 @@
   // --------------------------------------------------------------------------
   // Renderização da Grade e Aplicação de Filtros Reativa no Navegador
   // --------------------------------------------------------------------------
+  /**
+   * Identifica o índice do slot correspondente ao dia e horário corrente
+   * @param {Array} slotsAtivos - Lista dos slots atualmente visíveis na grade
+   * @returns {number} Índice do slot em slotsAtivos ou -1 caso fora do horário letivo/dia
+   */
+  function obterIndiceSlotAtual(slotsAtivos) {
+    if (!slotsAtivos || slotsAtivos.length === 0) return -1;
+    const agora = new Date();
+    const diaNum = agora.getDay();
+    // Mapeamento dos dias letivos reais (1: Seg ... 6: Sáb)
+    const mapaDiaReal = { 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+    const chaveDiaHoje = mapaDiaReal[diaNum];
+    if (!chaveDiaHoje) return -1;
+
+    const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+
+    return slotsAtivos.findIndex(item => {
+      const s = item.slot;
+      if (!s || s.dia !== chaveDiaHoje) return false;
+      if (s.horaInicioMin === null || s.horaFimMin === null) return false;
+      return agoraMin >= s.horaInicioMin && agoraMin < s.horaFimMin;
+    });
+  }
+
   function renderizarGrade() {
     aplicarFiltrosEAtualizarVisualizacao();
   }
@@ -1060,23 +1096,33 @@
     if (containerVazio) containerVazio.style.display = 'none';
     if (containerTab) containerTab.style.display = 'block';
 
-    // 4. Renderiza o Cabeçalho (THEAD)
+    // 4. Determina o slot de horário atual para destaque visual na grade
+    const idxSlotAtual = obterIndiceSlotAtual(slotsAtivos);
+
+    // 5. Renderiza o Cabeçalho (THEAD)
     let theadHtml = '<tr>';
     theadHtml += '<th class="col-fixa-sala" rowspan="2">Sala</th>';
     theadHtml += '<th class="col-fixa-cap" rowspan="2">Lugares</th>';
 
     const diasChaves = Object.keys(mapaDiasAtivos);
+    const agoraHoje = new Date();
+    const mapaDiaReal = { 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+    const chaveDiaHoje = mapaDiaReal[agoraHoje.getDay()] || null;
 
     diasChaves.forEach((diaKey, dIdx) => {
       const diaObj = mapaDiasAtivos[diaKey];
       const diaClass = (dIdx % 2 === 0) ? 'dia-par' : 'dia-impar';
       const ehUltimoDia = (dIdx === diasChaves.length - 1);
       const bordaFim = !ehUltimoDia ? ' col-dia-fim' : '';
-      theadHtml += `<th colspan="${diaObj.slots.length}" class="th-dia-header ${diaClass}${bordaFim}">${diaObj.nome}</th>`;
+      const ehDiaHoje = (diaKey === chaveDiaHoje);
+      const classeHoje = ehDiaHoje ? ' dia-hoje-atual' : '';
+      const iconeHoje = ehDiaHoje ? '⚡ ' : '';
+      const titleDia = ehDiaHoje ? `${diaObj.nome} (Hoje)` : diaObj.nome;
+      theadHtml += `<th colspan="${diaObj.slots.length}" class="th-dia-header ${diaClass}${bordaFim}${classeHoje}" title="${titleDia}">${iconeHoje}${diaObj.nome}</th>`;
     });
     theadHtml += '</tr><tr>';
 
-    slotsAtivos.forEach(item => {
+    slotsAtivos.forEach((item, sIdx) => {
       const s = item.slot;
       const dIdx = diasChaves.indexOf(s.dia);
       const diaClass = (dIdx % 2 === 0) ? 'dia-par' : 'dia-impar';
@@ -1084,13 +1130,25 @@
       const ehUltimoSlotDoDia = (slotsDoDia[slotsDoDia.length - 1] === item);
       const ehUltimoDia = (dIdx === diasChaves.length - 1);
       const bordaFim = (ehUltimoSlotDoDia && !ehUltimoDia) ? ' col-dia-fim' : '';
-      theadHtml += `<th class="th-slot-header ${diaClass}${bordaFim}" title="${s.label || s.textoInicio}">${s.label || s.textoInicio}</th>`;
+
+      const ehSlotAtual = (sIdx === idxSlotAtual);
+
+      let classesSlot = `th-slot-header ${diaClass}${bordaFim}`;
+      if (ehSlotAtual) {
+        classesSlot += ' col-slot-atual';
+      }
+
+      const rotuloSlot = s.label || s.textoInicio;
+      const iconeRaio = ehSlotAtual ? '⚡ ' : '';
+      const titleAttr = ehSlotAtual ? `${rotuloSlot} (Horário Atual em Andamento)` : rotuloSlot;
+
+      theadHtml += `<th class="${classesSlot}" title="${titleAttr}">${iconeRaio}${rotuloSlot}</th>`;
     });
     theadHtml += '</tr>';
 
     document.getElementById('grade-cabecalho').innerHTML = theadHtml;
 
-    // 5. Renderiza o Corpo da Tabela (TBODY)
+    // 6. Renderiza o Corpo da Tabela (TBODY)
     let tbodyHtml = '';
 
     salasVisiveis.forEach(itemSala => {

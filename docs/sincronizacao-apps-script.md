@@ -165,6 +165,18 @@ O projeto implementa **Versionamento Semântico (SemVer)** com **Contador de Bui
 
 ---
 
+### 5.6. Captura Rápida de Ideias e Backlog (`idea` ou `backlog`)
+
+Para registrar pensamentos ou melhorias instantaneamente sem interromper o raciocínio nem abrir arquivos:
+
+```powershell
+python tools/gas_sync.py idea "Sua ideia em uma única sentença"
+```
+
+A anotação é gravada imediatamente na seção **`📥 Inbox`** do arquivo [`BACKLOG.md`](../BACKLOG.md) na raiz do repositório.
+
+---
+
 ## 6. Mapeamento de Arquivos Local $\leftrightarrow$ Nuvem
 
 O Google Apps Script trata arquivos sem extensão e com tipos formais. O `gas_sync.py` realiza essa tradução de forma transparente:

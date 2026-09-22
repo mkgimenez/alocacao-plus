@@ -8,7 +8,9 @@ Uso:
     python tools/gas_sync.py pull              # Baixa arquivos do Apps Script para src/
     python tools/gas_sync.py watch             # Monitora src/ e sincroniza automaticamente a cada Ctrl+S (incrementa build)
     python tools/gas_sync.py bump [patch|minor|major|<versao>]  # Promove versão e reseta build (ex: bump patch)
+    python tools/gas_sync.py build             # Incrementa manualmente o número de build
     python tools/gas_sync.py version           # Exibe informações da versão e build atuais
+    python tools/gas_sync.py idea "Sua ideia"  # Anota rapidamente uma ideia/tarefa na Inbox do BACKLOG.md
     python tools/gas_sync.py status            # Exibe informações do projeto no Apps Script
     python tools/gas_sync.py init <SCRIPT_ID>  # Configura o Script ID do projeto
 """
@@ -52,6 +54,7 @@ CLASP_FILE = ROOT_DIR / ".clasp.json"
 TOKEN_FILE = ROOT_DIR / "token_gas.json"
 VERSION_FILE = ROOT_DIR / "version.json"
 SRC_VERSION_FILE = SRC_DIR / "version.gs"
+BACKLOG_FILE = ROOT_DIR / "BACKLOG.md"
 CREDENTIALS_FILES = [
     ROOT_DIR / "credentials.json",
     ROOT_DIR / "tools" / "credentials.json"
@@ -207,6 +210,73 @@ def mostrar_versao():
     print(f"📋 Versão Completa: {dados.get('full_version', 'N/D')}")
     print(f"🕒 Última alteração:{dados.get('last_updated', 'N/D')}")
     print("=" * 55 + "\n")
+
+
+def adicionar_ideia_backlog(texto=None):
+    """Adiciona uma ideia ou anotação rápida de 1 sentença na Inbox do BACKLOG.md."""
+    if not BACKLOG_FILE.exists():
+        print(f"❌ Arquivo '{BACKLOG_FILE.name}' não encontrado na raiz do projeto.")
+        return
+
+    if not texto:
+        print("\n💡 Adicionar Ideia ao Backlog (1 sentença):")
+        try:
+            texto = input("> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperação cancelada.")
+            return
+
+    texto = (texto or "").strip()
+    if not texto:
+        print("⚠️  Nenhuma ideia informada. Operação cancelada.")
+        return
+
+    # Remove marcadores duplicados caso o usuário tenha digitado "- [ ] " ou "- "
+    if texto.startswith("- [ ] "):
+        texto = texto[6:].strip()
+    elif texto.startswith("- "):
+        texto = texto[2:].strip()
+
+    nova_linha = f"- [ ] {texto}\n"
+
+    try:
+        conteudo = BACKLOG_FILE.read_text(encoding="utf-8")
+        marcador = "## 📥 Inbox (Captura Rápida)"
+
+        if marcador in conteudo:
+            partes = conteudo.split(marcador, 1)
+            cabecalho = partes[0] + marcador
+            resto = partes[1]
+
+            # Encontra onde termina eventual bloco de comentário <!-- ... -->
+            idx_inicio_corpo = 0
+            if "-->" in resto:
+                idx_inicio_corpo = resto.find("-->") + 3
+
+            bloco_comentario = resto[:idx_inicio_corpo]
+            depois = resto[idx_inicio_corpo:].lstrip("\r\n")
+
+            # Limpa placeholder vazio se existir
+            if depois.startswith("- [ ] \n") or depois.startswith("- [ ]\r\n"):
+                depois = depois.split("\n", 1)[1]
+            elif depois.strip() == "- [ ]":
+                depois = ""
+
+            novo_conteudo = f"{cabecalho}{bloco_comentario}\n\n{nova_linha}{depois}"
+            BACKLOG_FILE.write_text(novo_conteudo, encoding="utf-8")
+        else:
+            with open(BACKLOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"\n{nova_linha}")
+
+        print("\n" + "=" * 60)
+        print("✨ IDEIA ADICIONADA À INBOX DO BACKLOG COM SUCESSO!")
+        print("=" * 60)
+        print(f"📝 Anotação: {nova_linha.strip()}")
+        print(f"📁 Arquivo:  {BACKLOG_FILE.name}")
+        print("=" * 60 + "\n")
+    except Exception as e:
+        print(f"❌ Erro ao atualizar '{BACKLOG_FILE.name}': {e}")
+
 
 
 def imprimir_instrucoes_credentials():
@@ -681,6 +751,10 @@ def watch(service, script_id):
                     print(f"\n[{hora}] 🏷️  Versão atualizada: {dados_v.get('full_version', '')}")
                 else:
                     print(f"\n[{hora}] ✏️  Alteração detectada: {', '.join(modificados)}")
+                    dados_v = incrementar_build()
+                    print(f"[{hora}] 🔨 Build atualizado: {dados_v.get('full_version', '')}")
+                    if "version.gs" not in modificados:
+                        modificados.append("version.gs")
 
                 # Debounce de 0.5s para agrupamento de salvamentos
                 time.sleep(0.5)
@@ -699,16 +773,16 @@ def main():
     )
     parser.add_argument(
         "comando",
-        choices=["push", "pull", "watch", "status", "init", "bump", "version"],
+        choices=["push", "pull", "watch", "status", "init", "bump", "build", "version", "idea", "backlog"],
         nargs="?",
         default="push",
-        help="Ação a executar: push (padrão), pull, watch, status, init, bump ou version"
+        help="Ação a executar: push (padrão), pull, watch, status, init, bump, build, version ou idea/backlog"
     )
     parser.add_argument(
         "parametro",
         nargs="?",
         default=None,
-        help="Parâmetro adicional (ex: Script ID no 'init' ou arquivo específico no 'push')"
+        help="Parâmetro adicional (ex: Script ID no 'init', arquivo específico no 'push' ou texto da ideia)"
     )
     parser.add_argument(
         "--script-id",
@@ -723,9 +797,18 @@ def main():
         mostrar_versao()
         return
 
+    if args.comando == "build":
+        dados = incrementar_build()
+        print(f"\n🔨 Build incrementado: {dados.get('full_version', '')}\n")
+        return
+
     if args.comando == "bump":
         tipo = args.parametro or "patch"
         executar_bump(tipo)
+        return
+
+    if args.comando in ("idea", "backlog"):
+        adicionar_ideia_backlog(args.parametro)
         return
 
     # Comando init não requer autenticação prévia

@@ -40,6 +40,7 @@ O projeto segue as convenções modernas de versionamento Git e isolamento de c�
 alocacao-plus/
 ├── .gitignore                     # Proteção de tokens, credenciais e caches
 ├── README.md                      # Documentação central do projeto
+├── BACKLOG.md                     # Gestão ágil de ideias e tarefas pendentes
 ├── version.json                   # Fonte da verdade do versionamento (SemVer + Build)
 │
 ├── src/                           # Código-fonte executado no Google Apps Script
@@ -113,6 +114,12 @@ Utilize o utilitário nativo [`tools/gas_sync.py`](tools/gas_sync.py) que aprove
    ```bash
    python tools/gas_sync.py push
    ```
+
+5. **Anotar Ideias Rápidas no Backlog:**
+   ```bash
+   python tools/gas_sync.py idea "Sua ideia em uma frase"
+   ```
+   *(Insere imediatamente na seção **Inbox** do [`BACKLOG.md`](BACKLOG.md) sem interromper seu fluxo)*
 
 ### Opção 3: Via Google Clasp (Node.js)
 
