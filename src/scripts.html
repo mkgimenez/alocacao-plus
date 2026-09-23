@@ -18,7 +18,16 @@
     buscaSala: '',
     focarColunasMatch: true,
     horariosInicioDisponiveis: [],
-    horariosFimDisponiveis: []
+    horariosFimDisponiveis: [],
+    // --- Enriquecimento Progressivo Jupiterweb ---
+    cacheJupiter: {},
+    filaJupiter: [],
+    jupiterRequisicaoEmVoo: false,
+    jupiterLoteEmVoo: [],
+    jupiterCallbacksUrgentes: {},
+    jupiterContadorOrdem: 0,
+    _salasVisiveisAtuais: [],
+    _slotsAtivosAtuais: []
   };
 
   const MAPA_DIAS_SEMANA = {
@@ -39,6 +48,9 @@
   window.addEventListener('DOMContentLoaded', function() {
     configurarIndicadorHoje();
     iniciarMonitoramentoHorarioAtual();
+    iniciarMonitoramentoScrollGrade();
+    configurarDelegacaoEventosGrade();
+    configurarEventosModalDisciplina();
     carregarDadosDoBackend();
   });
 
@@ -89,6 +101,19 @@
       btn.disabled = true;
       btn.style.opacity = '0.7';
     }
+
+    // Exibe o estado de carregamento com spinner idêntico à abertura inicial
+    exibirCarregando(true);
+    const txtContador = document.getElementById('txt-contador-resultados');
+    if (txtContador) {
+      txtContador.textContent = 'Conectando à grade oficial do SVGRAD...';
+    }
+
+    // Limpa o cache do Júpiter no cliente (memória RAM e sessionStorage)
+    if (typeof limparCacheLocalJupiter === 'function') {
+      limparCacheLocalJupiter();
+    }
+
     carregarDadosDoBackend(true);
   }
 
@@ -128,7 +153,7 @@
       if (eraRecarregamentoManual) {
         exibirToast(
           'Sincronização Concluída',
-          `Grade oficial do SVGRAD sincronizada com sucesso (${resposta.dados.timestamp}).`,
+          `Grade oficial do SVGRAD e dados do Jupiterweb sincronizados (${resposta.dados.timestamp}).`,
           'sucesso'
         );
       }
@@ -150,6 +175,9 @@
     exibirToast('Erro de Conexão', msg, 'erro');
     if (!estadoApp.dadosBrutos) {
       exibirErroCarregamento(msg);
+    } else {
+      exibirCarregando(false);
+      renderizarGrade();
     }
   }
 
@@ -1046,6 +1074,9 @@
       ? salasElegiveis.filter(item => estadoApp.salasSelecionadas.has(item.sala.nome))
       : salasElegiveis;
 
+    estadoApp._salasVisiveisAtuais = salasVisiveis;
+    estadoApp._slotsAtivosAtuais = slotsAtivos;
+
     // 7. Atualiza os Contadores Informativos
     const txtContador = document.getElementById('txt-contador-resultados');
     if (txtContador) {
@@ -1197,7 +1228,14 @@
           destaqueClass = ' celula-destacada-busca';
         }
 
-        const conteudo = temAula ? (celEfetiva.h || celEfetiva.t || '') : '';
+        let ativaModalClass = '';
+        if (celulaAtivaInfo && String(celulaAtivaInfo.rIdx) === String(rIdx) && String(celulaAtivaInfo.cIdx) === String(itemSlot.cIdx)) {
+          if (celulaAtivaInfo.expireAt === 0 || Date.now() < celulaAtivaInfo.expireAt) {
+            ativaModalClass = ' celula-ativa-modal';
+          }
+        }
+
+        const conteudo = temAula ? gerarConteudoCelula(celEfetiva) : '';
 
         const slotInfo = itemSlot.slot;
         const dIdx = diasChaves.indexOf(slotInfo.dia);
@@ -1208,7 +1246,7 @@
         const ehFimDoDia = (slotFimCelula === ultimoSlotDoDia) && (dIdx < diasChaves.length - 1);
         const bordaFim = ehFimDoDia ? ' col-dia-fim' : '';
 
-        tbodyHtml += `<td class="celula-grade ${diaClass}${bordaFim}${aulaClass}${destaqueClass}"${csAttr}${bgStyle}>${conteudo}</td>`;
+        tbodyHtml += `<td class="celula-grade ${diaClass}${bordaFim}${aulaClass}${destaqueClass}${ativaModalClass}" data-cidx="${itemSlot.cIdx}"${csAttr}${bgStyle}>${conteudo}</td>`;
 
         colIdxRelativo += colspanVisivel;
       }
@@ -1217,6 +1255,1000 @@
     });
 
     document.getElementById('grade-corpo').innerHTML = tbodyHtml;
+
+    if (celulaAtivaInfo && (celulaAtivaInfo.expireAt === 0 || Date.now() < celulaAtivaInfo.expireAt)) {
+      celulaAtivaModal = document.querySelector(`tr[data-idx="${celulaAtivaInfo.rIdx}"] td[data-cidx="${celulaAtivaInfo.cIdx}"]`);
+    } else {
+      celulaAtivaModal = null;
+    }
+
+    // Enfileira disciplinas visíveis para enriquecimento progressivo em segundo plano
+    extrairCodigosVisiveisEAgendar();
+  }
+
+  // ==========================================================================
+  // MÓDULO DE ENRIQUECIMENTO PROGRESSIVO JUPITERWEB (BACKGROUND WORKER & CACHE)
+  // ==========================================================================
+
+  let jupiterTimerPausa = null;
+  let jupiterTimerDebounceScroll = null;
+  const PREFIXO_STORAGE_JUPITER = 'alocacao_jupiter_v18_';
+
+  // Limpeza de caches legados de versões anteriores no sessionStorage
+  try {
+    const chavesParaRemover = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('alocacao_jupiter_') && !k.startsWith(PREFIXO_STORAGE_JUPITER)) {
+        chavesParaRemover.push(k);
+      }
+    }
+    chavesParaRemover.forEach(k => sessionStorage.removeItem(k));
+  } catch (e) {}
+
+  /**
+   * Obtém os dados de uma disciplina do cache de memória ou sessionStorage.
+   * Retorna o objeto de dados ou null caso não esteja cacheado.
+   */
+  function obterCacheJupiter(codigo) {
+    if (!codigo) return null;
+    const cod = String(codigo).trim().toUpperCase();
+    if (estadoApp.cacheJupiter && estadoApp.cacheJupiter[cod]) {
+      return estadoApp.cacheJupiter[cod];
+    }
+    try {
+      const salvo = sessionStorage.getItem(PREFIXO_STORAGE_JUPITER + cod);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        if (!estadoApp.cacheJupiter) estadoApp.cacheJupiter = {};
+        estadoApp.cacheJupiter[cod] = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      // sessionStorage indisponível ou bloqueado
+    }
+    return null;
+  }
+
+  /**
+   * Salva os dados de uma disciplina no cache de memória e no sessionStorage.
+   */
+  function salvarCacheJupiter(codigo, dados) {
+    if (!codigo || !dados) return;
+    const cod = String(codigo).trim().toUpperCase();
+    if (!estadoApp.cacheJupiter) estadoApp.cacheJupiter = {};
+    estadoApp.cacheJupiter[cod] = dados;
+    try {
+      sessionStorage.setItem(PREFIXO_STORAGE_JUPITER + cod, JSON.stringify(dados));
+    } catch (e) {
+      // Quota excedida ou restrição do navegador
+    }
+  }
+
+  /**
+   * Limpa integralmente o cache do Júpiterweb no navegador (memória RAM e sessionStorage),
+   * cancela requisições pendentes e zera a fila de enriquecimento progressivo.
+   */
+  function limparCacheLocalJupiter() {
+    estadoApp.cacheJupiter = {};
+    estadoApp.filaJupiter = [];
+    estadoApp.jupiterCallbacksUrgentes = {};
+    estadoApp.jupiterContadorOrdem = 0;
+    if (jupiterTimerPausa) {
+      clearTimeout(jupiterTimerPausa);
+      jupiterTimerPausa = null;
+    }
+    try {
+      const chavesParaRemover = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('alocacao_jupiter_')) {
+          chavesParaRemover.push(k);
+        }
+      }
+      chavesParaRemover.forEach(k => sessionStorage.removeItem(k));
+    } catch (e) {
+      console.warn('Erro ao limpar sessionStorage do Jupiterweb:', e);
+    }
+  }
+
+  /**
+   * Enfileira um código na fila de enriquecimento progressivo.
+   * Se já estiver na fila com prioridade menor, atualiza para a nova prioridade mais urgente.
+   */
+  function enfileirarJupiter(codigo, prioridade = 2) {
+    if (!codigo) return false;
+    const cod = String(codigo).trim().toUpperCase();
+    if (!cod || obterCacheJupiter(cod)) return false;
+
+    // Se já está no lote em voo, atualiza urgência se for Prioridade 0
+    if (estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1) {
+      return false;
+    }
+
+    // Se já está na fila
+    const itemExistente = estadoApp.filaJupiter.find(item => item.codigo === cod);
+    if (itemExistente) {
+      if (prioridade < itemExistente.prioridade) {
+        itemExistente.prioridade = prioridade;
+        reordenarFilaJupiter();
+      }
+      return true;
+    }
+
+    // Adiciona novo item na fila
+    estadoApp.filaJupiter.push({
+      codigo: cod,
+      prioridade: prioridade,
+      ordem: ++estadoApp.jupiterContadorOrdem
+    });
+    reordenarFilaJupiter();
+    return true;
+  }
+
+  /**
+   * Promove imediatamente uma disciplina para Prioridade 0 (urgente), acionada por clique do usuário.
+   */
+  function promoverUrgenteJupiter(codigo, callback) {
+    if (!codigo) return;
+    const cod = String(codigo).trim().toUpperCase();
+
+    if (callback) {
+      if (!estadoApp.jupiterCallbacksUrgentes[cod]) {
+        estadoApp.jupiterCallbacksUrgentes[cod] = [];
+      }
+      estadoApp.jupiterCallbacksUrgentes[cod].push(callback);
+    }
+
+    const emCache = obterCacheJupiter(cod);
+    if (emCache) {
+      if (callback) {
+        callback(emCache);
+        const arr = estadoApp.jupiterCallbacksUrgentes[cod];
+        if (arr) {
+          const idx = arr.indexOf(callback);
+          if (idx !== -1) arr.splice(idx, 1);
+        }
+      }
+      return;
+    }
+
+    enfileirarJupiter(cod, 0);
+    processarFilaJupiter();
+  }
+
+  /**
+   * Reordena a fila: prioridade 0 (urgente) primeiro, depois 1 (visível), depois 2 (oculto).
+   * Para mesma prioridade, mantém ordem FIFO de chegada.
+   */
+  function reordenarFilaJupiter() {
+    estadoApp.filaJupiter.sort((a, b) => {
+      if (a.prioridade !== b.prioridade) {
+        return a.prioridade - b.prioridade;
+      }
+      return a.ordem - b.ordem;
+    });
+  }
+
+  /**
+   * Reavalia prioridades da fila com base nos elementos visíveis na grade.
+   */
+  function atualizarVisibilidadeFilaJupiter(codigosVisiveis, todosCodigos) {
+    const listaVisiveis = [];
+    const setVisiveis = new Set();
+
+    (codigosVisiveis || []).forEach(c => {
+      if (c) {
+        const cn = String(c).trim().toUpperCase();
+        if (cn && !setVisiveis.has(cn)) {
+          setVisiveis.add(cn);
+          listaVisiveis.push(cn);
+        }
+      }
+    });
+
+    // 1. Atualiza prioridade dos itens já na fila (preserva Prioridade 0 urgente)
+    estadoApp.filaJupiter.forEach(item => {
+      if (item.prioridade === 0) return;
+      if (setVisiveis.has(item.codigo)) {
+        item.prioridade = 1;
+      } else {
+        item.prioridade = 2;
+      }
+    });
+
+    // 2. Adiciona novos códigos visíveis ainda não presentes (com Prioridade 1)
+    listaVisiveis.forEach(cod => {
+      if (!obterCacheJupiter(cod) && !(estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1)) {
+        if (!estadoApp.filaJupiter.some(item => item.codigo === cod)) {
+          estadoApp.filaJupiter.push({
+            codigo: cod,
+            prioridade: 1,
+            ordem: ++estadoApp.jupiterContadorOrdem
+          });
+        }
+      }
+    });
+
+    // 3. Adiciona demais códigos com Prioridade 2 (ocultos) se informados
+    if (todosCodigos) {
+      const vistosTodos = new Set();
+      todosCodigos.forEach(codRaw => {
+        if (!codRaw) return;
+        const cod = String(codRaw).trim().toUpperCase();
+        if (cod && !setVisiveis.has(cod) && !vistosTodos.has(cod) && !obterCacheJupiter(cod)) {
+          vistosTodos.add(cod);
+          if (!(estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1)) {
+            if (!estadoApp.filaJupiter.some(item => item.codigo === cod)) {
+              estadoApp.filaJupiter.push({
+                codigo: cod,
+                prioridade: 2,
+                ordem: ++estadoApp.jupiterContadorOrdem
+              });
+            }
+          }
+        }
+      });
+    }
+
+    reordenarFilaJupiter();
+  }
+
+  /**
+   * Extrai os códigos das células visíveis (respeitando viewport) e de toda a grade, agendando na fila.
+   */
+  function extrairCodigosVisiveisEAgendar() {
+    if (!estadoApp.dadosBrutos || !estadoApp.dadosBrutos.grade) return;
+
+    const dados = estadoApp.dadosBrutos;
+    const matrizGrade = dados.grade || [];
+    const salasVisiveis = estadoApp._salasVisiveisAtuais || [];
+    const slotsAtivos = estadoApp._slotsAtivosAtuais || [];
+
+    const codigosVisiveisSet = new Set();
+    const codigosVisiveis = [];
+
+    // Prioriza elementos no viewport se tabela estiver montada
+    const containerGrade = document.getElementById('grade-tabela-container');
+    const containerRect = containerGrade ? containerGrade.getBoundingClientRect() : null;
+
+    let salasOrdenadas = salasVisiveis;
+    if (containerGrade && containerRect) {
+      const linhasTr = containerGrade.querySelectorAll('tr.linha-grade-sala');
+      const setIdxViewport = new Set();
+
+      linhasTr.forEach(tr => {
+        const rect = tr.getBoundingClientRect();
+        if (rect.bottom >= (containerRect.top - 80) && rect.top <= (containerRect.bottom + 80)) {
+          const idx = parseInt(tr.getAttribute('data-idx'), 10);
+          if (!isNaN(idx)) setIdxViewport.add(idx);
+        }
+      });
+
+      if (setIdxViewport.size > 0) {
+        const noViewport = [];
+        const foraViewport = [];
+        salasVisiveis.forEach(item => {
+          if (setIdxViewport.has(item.rIdx)) {
+            noViewport.push(item);
+          } else {
+            foraViewport.push(item);
+          }
+        });
+        salasOrdenadas = noViewport.concat(foraViewport);
+      }
+    }
+
+    // 1. Extrai códigos das salas visíveis na ordem visual
+    salasOrdenadas.forEach(itemSala => {
+      const rIdx = itemSala.rIdx;
+      const linha = matrizGrade[rIdx] || [];
+      slotsAtivos.forEach(itemSlot => {
+        const cIdx = itemSlot.cIdx;
+        const cel = obterCelulaEfetiva(linha, cIdx);
+        if (cel && cel.d && Array.isArray(cel.d) && !cel.pos) {
+          cel.d.forEach(cod => {
+            const codNorm = String(cod).trim().toUpperCase();
+            if (codNorm && !codigosVisiveisSet.has(codNorm)) {
+              codigosVisiveisSet.add(codNorm);
+              codigosVisiveis.push(codNorm);
+            }
+          });
+        }
+      });
+    });
+
+    // 2. Extrai demais códigos de graduação da grade completa
+    const todosCodigosSet = new Set(codigosVisiveisSet);
+    const todosCodigos = [...codigosVisiveis];
+
+    matrizGrade.forEach(linha => {
+      if (!Array.isArray(linha)) return;
+      linha.forEach(cel => {
+        if (cel && cel.d && Array.isArray(cel.d) && !cel.pos) {
+          cel.d.forEach(cod => {
+            const codNorm = String(cod).trim().toUpperCase();
+            if (codNorm && !todosCodigosSet.has(codNorm)) {
+              todosCodigosSet.add(codNorm);
+              todosCodigos.push(codNorm);
+            }
+          });
+        }
+      });
+    });
+
+    atualizarVisibilidadeFilaJupiter(codigosVisiveis, todosCodigos);
+    processarFilaJupiter();
+  }
+
+  /**
+   * Loop do Background Worker: despacha requisições em lote de até 3 códigos por vez.
+   * Garante ESTRITAMENTE no máximo 1 lote em trânsito simultâneo.
+   */
+  function processarFilaJupiter() {
+    if (estadoApp.jupiterRequisicaoEmVoo) return;
+    if (!estadoApp.filaJupiter || estadoApp.filaJupiter.length === 0) return;
+
+    // Descarta do topo códigos que já estejam no cache
+    while (estadoApp.filaJupiter.length > 0 && obterCacheJupiter(estadoApp.filaJupiter[0].codigo)) {
+      estadoApp.filaJupiter.shift();
+    }
+
+    if (estadoApp.filaJupiter.length === 0) return;
+
+    const TAMANHO_LOTE = 3;
+    const loteItens = [];
+    const codigosLote = [];
+
+    while (estadoApp.filaJupiter.length > 0 && loteItens.length < TAMANHO_LOTE) {
+      const item = estadoApp.filaJupiter.shift();
+      if (!obterCacheJupiter(item.codigo) && codigosLote.indexOf(item.codigo) === -1) {
+        loteItens.push(item);
+        codigosLote.push(item.codigo);
+      }
+    }
+
+    if (codigosLote.length === 0) {
+      processarFilaJupiter();
+      return;
+    }
+
+    estadoApp.jupiterRequisicaoEmVoo = true;
+    estadoApp.jupiterLoteEmVoo = codigosLote;
+
+    // Se estiver em ambiente de teste local sem google.script.run
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      setTimeout(() => {
+        concluirLoteJupiter({});
+      }, 500);
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(resposta) {
+        concluirLoteJupiter(resposta && resposta.sucesso && resposta.dados ? resposta.dados : {});
+      })
+      .withFailureHandler(function(erro) {
+        console.warn('[Jupiterweb Worker] Falha ao consultar lote:', codigosLote, erro);
+        falharLoteJupiter(codigosLote);
+      })
+      .obterLoteJupiterweb(codigosLote);
+  }
+
+  /**
+   * Processa o retorno com sucesso de um lote do backend.
+   */
+  function concluirLoteJupiter(dadosRecebidos) {
+    const lote = estadoApp.jupiterLoteEmVoo || [];
+    estadoApp.jupiterRequisicaoEmVoo = false;
+    estadoApp.jupiterLoteEmVoo = [];
+
+    lote.forEach(cod => {
+      const dados = dadosRecebidos ? dadosRecebidos[cod] : null;
+      if (dados) {
+        salvarCacheJupiter(cod, dados);
+      } else {
+        salvarCacheJupiter(cod, { semOferecimento: true, turmas: [] });
+      }
+
+      // Executa eventuais callbacks de clique urgente
+      if (estadoApp.jupiterCallbacksUrgentes[cod]) {
+        const callbacks = estadoApp.jupiterCallbacksUrgentes[cod];
+        delete estadoApp.jupiterCallbacksUrgentes[cod];
+        callbacks.forEach(cb => {
+          try { cb(obterCacheJupiter(cod)); } catch (e) { console.error(e); }
+        });
+      }
+    });
+
+    // Atualiza links visíveis no DOM
+    atualizarEnriquecimentoCelulasVisiveis(lote);
+
+    // Pausa de alívio de 250ms antes de disparar o próximo lote
+    if (jupiterTimerPausa) clearTimeout(jupiterTimerPausa);
+    jupiterTimerPausa = setTimeout(processarFilaJupiter, 250);
+  }
+
+  /**
+   * Trata falha na requisição do lote, re-enfileirando os itens para não haver perda.
+   */
+  function falharLoteJupiter(codigosLote) {
+    estadoApp.jupiterRequisicaoEmVoo = false;
+    estadoApp.jupiterLoteEmVoo = [];
+
+    (codigosLote || []).forEach(cod => {
+      if (estadoApp.jupiterCallbacksUrgentes[cod]) {
+        const callbacks = estadoApp.jupiterCallbacksUrgentes[cod];
+        delete estadoApp.jupiterCallbacksUrgentes[cod];
+        callbacks.forEach(cb => {
+          try { cb(null, 'Falha de comunicação com o servidor ao consultar dados do Jupiterweb.'); } catch (e) { console.error(e); }
+        });
+      }
+
+      // Re-enfileira no final com Prioridade 2
+      if (!obterCacheJupiter(cod)) {
+        enfileirarJupiter(cod, 2);
+      }
+    });
+
+    // Pausa preventiva de 3s antes de retomar
+    if (jupiterTimerPausa) clearTimeout(jupiterTimerPausa);
+    jupiterTimerPausa = setTimeout(processarFilaJupiter, 3000);
+  }
+
+  /**
+   * Extrai o nome do(s) docente(s) para formatação do tooltip no hover.
+   * Ex: "Docente: Carlos Dias Maciel", "Docentes: Carlos Dias, Marcelo Becker", "Docente: A designar".
+   */
+  function extrairDocentesParaTooltip(dados, turmasSolicitadas) {
+    if (!dados) return '';
+    if (dados.semOferecimento) {
+      return 'Sem oferecimento ativo no Jupiterweb';
+    }
+
+    const turmasObj = dados.turmas || {};
+    const chavesTurmas = Object.keys(turmasObj);
+    if (chavesTurmas.length === 0) {
+      return 'Docente: A designar';
+    }
+
+    const docentesSet = new Set();
+
+    if (turmasSolicitadas && turmasSolicitadas.length > 0) {
+      turmasSolicitadas.forEach(tSol => {
+        const tNorm = String(tSol).padStart(2, '0');
+        let tMatch = turmasObj[tNorm] || turmasObj[String(parseInt(tNorm, 10))];
+        if (!tMatch) {
+          for (let i = 0; i < chavesTurmas.length; i++) {
+            const k = chavesTurmas[i];
+            const v = turmasObj[k];
+            if (v && (String(v.numero).padStart(2, '0') === tNorm || String(v.codigoTurma || '').endsWith(tNorm))) {
+              tMatch = v;
+              break;
+            }
+          }
+        }
+        if (tMatch && tMatch.docentes) {
+          tMatch.docentes.forEach(d => {
+            if (d && d !== 'A Designar' && d !== '-') docentesSet.add(d);
+          });
+        }
+      });
+    }
+
+    // Se nenhuma turma específica casou ou turmas solicitadas estavam vazias, usa a primeira turma
+    if (docentesSet.size === 0) {
+      const primeira = turmasObj[chavesTurmas[0]];
+      if (primeira && primeira.docentes) {
+        primeira.docentes.forEach(d => {
+          if (d && d !== 'A Designar' && d !== '-') docentesSet.add(d);
+        });
+      }
+    }
+
+    if (docentesSet.size === 0) {
+      return 'Docente: A designar';
+    } else if (docentesSet.size === 1) {
+      return 'Docente: ' + Array.from(docentesSet)[0];
+    } else {
+      return 'Docentes: ' + Array.from(docentesSet).sort().join(', ');
+    }
+  }
+
+  /**
+   * Constrói o HTML interno de uma célula da grade de forma reativa,
+   * injetando data-codigo, data-turma, classe enriquecida e tooltip com docente.
+   */
+  function gerarConteudoCelula(celEfetiva) {
+    if (!celEfetiva || !celEfetiva.t) return '';
+    let html = celEfetiva.h || escapeHtml(celEfetiva.t);
+    if (!celEfetiva.d || !Array.isArray(celEfetiva.d) || celEfetiva.pos) {
+      return html;
+    }
+
+    const turmasArr = celEfetiva.turmas || [];
+    const turmasStr = turmasArr.join(',');
+
+    celEfetiva.d.forEach(codRaw => {
+      const cod = String(codRaw).trim().toUpperCase();
+      const dados = obterCacheJupiter(cod);
+
+      let novoTitle = null;
+      let classeExtra = '';
+
+      if (dados) {
+        classeExtra = ' link-disc-enriquecido';
+        if (dados.semOferecimento) {
+          novoTitle = `${cod} • Sem oferecimento ativo no Jupiterweb (clique para ver detalhes)`;
+        } else {
+          const docente = extrairDocentesParaTooltip(dados, turmasArr);
+          novoTitle = docente;
+        }
+      }
+
+      // Procura por tag <a contendo o código da disciplina
+      const padraoLink = new RegExp(`(<a\\s+[^>]*href=["'][^"']*${cod}[^"']*["'][^>]*>)([\\s\\S]*?<\\/a>)`, 'gi');
+      html = html.replace(padraoLink, (match, tagAbertura, resto) => {
+        let novaTag = tagAbertura;
+        if (!novaTag.includes('data-codigo=')) {
+          novaTag = novaTag.replace(/<a\b/i, `<a data-codigo="${cod}" data-turma="${escapeHtml(turmasStr)}" tabindex="0" role="button"`);
+        } else if (turmasStr && !novaTag.includes('data-turma=')) {
+          novaTag = novaTag.replace(/<a\b/i, `<a data-turma="${escapeHtml(turmasStr)}"`);
+        }
+        if (classeExtra && !novaTag.includes('link-disc-enriquecido')) {
+          novaTag = novaTag.replace(/class=["']([^"']*)["']/i, `class="$1${classeExtra}"`);
+        }
+        if (novoTitle) {
+          novaTag = novaTag.replace(/title=["'][^"']*["']/i, `title="${escapeHtml(novoTitle)}"`);
+        }
+        return novaTag + resto;
+      });
+    });
+
+    return html;
+  }
+
+  /**
+   * Atualiza tooltips e classes dos links correspondentes aos códigos enriquecidos no DOM.
+   */
+  function atualizarEnriquecimentoCelulasVisiveis(codigosAtualizados) {
+    if (!codigosAtualizados || codigosAtualizados.length === 0) return;
+    const containerGrade = document.getElementById('grade-corpo');
+    if (!containerGrade) return;
+
+    codigosAtualizados.forEach(cod => {
+      let links = containerGrade.querySelectorAll(`a.link-disc[data-codigo="${cod}"]`);
+      if (links.length === 0) {
+        links = containerGrade.querySelectorAll(`a.link-disc[href*="${cod}"]`);
+      }
+      const dados = obterCacheJupiter(cod);
+      if (dados && links.length > 0) {
+        links.forEach(link => {
+          if (!link.getAttribute('data-codigo')) {
+            link.setAttribute('data-codigo', cod);
+          }
+          link.classList.add('link-disc-enriquecido');
+          const turmaRaw = link.getAttribute('data-turma') || '';
+          const turmasArr = turmaRaw ? turmaRaw.split(',') : [];
+
+          if (dados.semOferecimento) {
+            link.title = `${cod} • Sem oferecimento ativo no Jupiterweb (clique para ver detalhes)`;
+          } else {
+            const docente = extrairDocentesParaTooltip(dados, turmasArr);
+            link.title = docente;
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Configura delegação de eventos de clique no corpo da grade para abrir o modal.
+   * Preserva Ctrl+Clique, Cmd+Clique, Shift+Clique e botão do meio para nova aba.
+   */
+  function configurarDelegacaoEventosGrade() {
+    const corpo = document.getElementById('grade-corpo');
+    if (!corpo) return;
+
+    corpo.addEventListener('click', function(e) {
+      const link = e.target.closest('a.link-disc');
+      if (!link) return;
+
+      // Preserva abertura em nova aba se o usuário usou teclas modificadoras ou botão do meio
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || (e.button !== undefined && e.button !== 0)) {
+        return;
+      }
+
+      // Disciplinas de Pós-Graduação (Janus): abre diretamente o sistema externo
+      if (link.classList.contains('link-pos')) {
+        return;
+      }
+
+      let codigo = link.getAttribute('data-codigo');
+      if (!codigo) {
+        const href = link.getAttribute('href') || link.href || '';
+        const matchHref = href.match(/sgldis=([A-Za-z0-9]+)/i);
+        if (matchHref) {
+          codigo = matchHref[1].toUpperCase();
+        } else {
+          const matchTxt = (link.textContent || '').match(/\b([A-Za-z]{3}\d{3,4}|\d{7})\b/);
+          if (matchTxt) codigo = matchTxt[1].toUpperCase();
+        }
+      }
+
+      if (!codigo) return;
+
+      // Se os dados do Jupiterweb para esta disciplina ainda não foram carregados:
+      // Mantém a setinha presente e permite a navegação direta para o link externo do Jupiterweb
+      const dados = obterCacheJupiter(codigo);
+      if (!dados && !link.classList.contains('link-disc-enriquecido')) {
+        if (typeof enfileirarJupiter === 'function') {
+          enfileirarJupiter(codigo, 1);
+        }
+        return;
+      }
+
+      // Dados já carregados: impede navegação externa e abre o Card Modal Elegante
+      e.preventDefault();
+
+      let turmaRaw = link.getAttribute('data-turma') || '';
+      if (!turmaRaw) {
+        const td = link.closest('td');
+        if (td) {
+          const matchT = (td.textContent || '').match(/\bT(\d{1,2})\b/gi);
+          if (matchT) turmaRaw = matchT.map(t => t.replace(/T/i, '')).join(',');
+        }
+      }
+      const turmas = turmaRaw ? turmaRaw.split(',').filter(Boolean) : [];
+
+      abrirCardDisciplina(codigo, turmas, link);
+    });
+
+    // Suporte a ativação via teclado (Enter / Espaço)
+    corpo.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const link = e.target.closest('a.link-disc');
+        if (link && !link.classList.contains('link-pos')) {
+          let codigo = link.getAttribute('data-codigo');
+          if (!codigo) {
+            const href = link.getAttribute('href') || link.href || '';
+            const matchHref = href.match(/sgldis=([A-Za-z0-9]+)/i);
+            if (matchHref) codigo = matchHref[1].toUpperCase();
+            else {
+              const matchTxt = (link.textContent || '').match(/\b([A-Za-z]{3}\d{3,4}|\d{7})\b/);
+              if (matchTxt) codigo = matchTxt[1].toUpperCase();
+            }
+          }
+          if (codigo) {
+            const dados = obterCacheJupiter(codigo);
+            if (dados || link.classList.contains('link-disc-enriquecido')) {
+              e.preventDefault();
+              let turmaRaw = link.getAttribute('data-turma') || '';
+              if (!turmaRaw) {
+                const td = link.closest('td');
+                if (td) {
+                  const matchT = (td.textContent || '').match(/\bT(\d{1,2})\b/gi);
+                  if (matchT) turmaRaw = matchT.map(t => t.replace(/T/i, '')).join(',');
+                }
+              }
+              const turmas = turmaRaw ? turmaRaw.split(',').filter(Boolean) : [];
+              abrirCardDisciplina(codigo, turmas, link);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Configura eventos de fechamento do modal (backdrop e teclado Esc).
+   */
+  function configurarEventosModalDisciplina() {
+    const modal = document.getElementById('modal-card-disciplina');
+    if (modal) {
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          fecharCardDisciplina();
+        }
+      });
+    }
+
+    // Tecla Escape para acessibilidade
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        const modal = document.getElementById('modal-card-disciplina');
+        if (modal && modal.classList.contains('aberto')) {
+          fecharCardDisciplina();
+        }
+      }
+    });
+  }
+
+  let ultimoElementoFocado = null;
+  let celulaAtivaModal = null;
+  let celulaAtivaInfo = null;
+  let timerDestaqueCelulaModal = null;
+
+  /**
+   * Abre o Card Modal Elegante para exibição de detalhes completos da disciplina.
+   */
+  function abrirCardDisciplina(codigo, turmasSolicitadas, elementoDisparador) {
+    if (!codigo) return;
+    const cod = String(codigo).trim().toUpperCase();
+
+    ultimoElementoFocado = elementoDisparador || document.activeElement;
+
+    // Cancela contagem regressiva anterior e limpa destaque da célula prévia, se houver
+    if (timerDestaqueCelulaModal) {
+      clearTimeout(timerDestaqueCelulaModal);
+      timerDestaqueCelulaModal = null;
+    }
+    if (celulaAtivaModal) {
+      celulaAtivaModal.classList.remove('celula-ativa-modal');
+      celulaAtivaModal = null;
+    }
+    celulaAtivaInfo = null;
+
+    // Destaca a célula clicada com os tons amarelos de Hoje/Agora
+    const disparador = elementoDisparador || document.activeElement;
+    if (disparador) {
+      const td = disparador.closest('td.celula-grade') || disparador.closest('td');
+      if (td) {
+        td.classList.add('celula-ativa-modal');
+        celulaAtivaModal = td;
+        const tr = td.closest('tr');
+        const rIdx = tr ? tr.getAttribute('data-idx') : null;
+        const cIdx = td.getAttribute('data-cidx');
+        celulaAtivaInfo = {
+          rIdx: rIdx,
+          cIdx: cIdx,
+          expireAt: 0 // 0 indica que o modal está aberto
+        };
+      }
+    }
+
+    const modal = document.getElementById('modal-card-disciplina');
+    if (!modal) return;
+
+    modal.classList.add('aberto');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // Cabeçalho básico imediato
+    const elCod = document.getElementById('modal-disc-codigo');
+    if (elCod) elCod.textContent = cod;
+
+    const elLinkExt = document.getElementById('modal-btn-link-jupiter');
+    if (elLinkExt) {
+      elLinkExt.href = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=' + encodeURIComponent(cod);
+    }
+
+    const dados = obterCacheJupiter(cod);
+    if (dados) {
+      exibirDadosModal(cod, dados, turmasSolicitadas);
+    } else {
+      // Exibe Skeleton Shimmer enquanto aguarda requisição urgente
+      const elSkeleton = document.getElementById('modal-card-skeleton');
+      if (elSkeleton) elSkeleton.style.display = 'flex';
+
+      const elSemOferecimento = document.getElementById('modal-card-sem-oferecimento');
+      if (elSemOferecimento) elSemOferecimento.style.display = 'none';
+
+      const elDados = document.getElementById('modal-card-dados');
+      if (elDados) elDados.style.display = 'none';
+
+      const elNome = document.getElementById('modal-disc-nome');
+      if (elNome) elNome.textContent = 'Carregando detalhes do Jupiterweb...';
+
+      // Promove com Prioridade 0 na fila
+      promoverUrgenteJupiter(cod, function(dadosCarregados, erro) {
+        const modalAtual = document.getElementById('modal-card-disciplina');
+        const codAtual = document.getElementById('modal-disc-codigo')?.textContent;
+        if (modalAtual && modalAtual.classList.contains('aberto') && codAtual === cod) {
+          if (dadosCarregados) {
+            exibirDadosModal(cod, dadosCarregados, turmasSolicitadas);
+          } else {
+            if (elSkeleton) elSkeleton.style.display = 'none';
+            if (elNome) elNome.textContent = cod;
+            if (elSemOferecimento) {
+              elSemOferecimento.style.display = 'block';
+              const h3 = elSemOferecimento.querySelector('h3');
+              if (h3) h3.textContent = 'Erro ao consultar Jupiterweb';
+              const p = elSemOferecimento.querySelector('p');
+              if (p) p.textContent = erro || 'Não foi possível carregar os dados no momento.';
+            }
+          }
+        }
+      });
+    }
+
+    setTimeout(() => {
+      const btnFechar = document.getElementById('modal-btn-fechar-topo');
+      if (btnFechar) btnFechar.focus();
+    }, 50);
+  }
+
+  /**
+   * Preenche a interface do modal com os dados estruturados recebidos.
+   */
+  function exibirDadosModal(codigo, dados, turmasSolicitadas) {
+    const elSkeleton = document.getElementById('modal-card-skeleton');
+    if (elSkeleton) elSkeleton.style.display = 'none';
+
+    const elNome = document.getElementById('modal-disc-nome');
+    if (elNome) elNome.textContent = dados.nome || codigo;
+
+    const elSemOferecimento = document.getElementById('modal-card-sem-oferecimento');
+    const elDados = document.getElementById('modal-card-dados');
+
+    if (dados.semOferecimento || !dados.turmas || Object.keys(dados.turmas).length === 0) {
+      if (elSemOferecimento) elSemOferecimento.style.display = 'block';
+      if (elDados) elDados.style.display = 'none';
+      return;
+    }
+
+    if (elSemOferecimento) elSemOferecimento.style.display = 'none';
+    if (elDados) elDados.style.display = 'block';
+
+    const turmasObj = dados.turmas;
+    const listaChaves = Object.keys(turmasObj).sort();
+    const elSeletor = document.getElementById('modal-seletor-turmas');
+
+    if (elSeletor) {
+      let htmlPills = '';
+      listaChaves.forEach(chave => {
+        const t = turmasObj[chave];
+        const rotulo = 'T' + (t.numero || chave);
+        htmlPills += `<button type="button" class="btn-pill-turma" data-turma-num="${escapeHtml(chave)}" role="tab" aria-selected="false">${escapeHtml(rotulo)}</button>`;
+      });
+      elSeletor.innerHTML = htmlPills;
+
+      // Evento de clique nas pills
+      elSeletor.querySelectorAll('.btn-pill-turma').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const num = this.getAttribute('data-turma-num');
+          selecionarTurmaNoModal(dados, num);
+        });
+      });
+    }
+
+    // Determina a turma a ser pré-selecionada
+    let turmaInicial = listaChaves[0];
+    if (turmasSolicitadas && turmasSolicitadas.length > 0) {
+      for (let i = 0; i < turmasSolicitadas.length; i++) {
+        const tSol = String(turmasSolicitadas[i]).padStart(2, '0');
+        if (turmasObj[tSol]) {
+          turmaInicial = tSol;
+          break;
+        }
+        const matchKey = listaChaves.find(k => {
+          const item = turmasObj[k];
+          return String(item.numero).padStart(2, '0') === tSol || String(item.codigoTurma || '').endsWith(tSol);
+        });
+        if (matchKey) {
+          turmaInicial = matchKey;
+          break;
+        }
+      }
+    }
+
+    selecionarTurmaNoModal(dados, turmaInicial);
+  }
+
+  /**
+   * Atualiza a visão dos detalhes da turma selecionada no modal.
+   */
+  function selecionarTurmaNoModal(dados, turmaEscolhida) {
+    const turmasObj = dados.turmas || {};
+    const turmaObj = turmasObj[turmaEscolhida];
+    if (!turmaObj) return;
+
+    // Atualiza classes ativas das pills
+    const pills = document.querySelectorAll('#modal-seletor-turmas .btn-pill-turma');
+    pills.forEach(p => {
+      if (p.getAttribute('data-turma-num') === turmaEscolhida) {
+        p.classList.add('ativa');
+        p.setAttribute('aria-selected', 'true');
+      } else {
+        p.classList.remove('ativa');
+        p.setAttribute('aria-selected', 'false');
+      }
+    });
+
+    // Metadados
+    const elCod = document.getElementById('modal-turma-codigo');
+    if (elCod) elCod.textContent = turmaObj.codigoTurma || turmaEscolhida;
+
+    const elTipo = document.getElementById('modal-turma-tipo');
+    if (elTipo) elTipo.textContent = turmaObj.tipo || 'Teórica';
+
+    const elPeriodo = document.getElementById('modal-turma-periodo');
+    if (elPeriodo) elPeriodo.textContent = turmaObj.periodo || 'Semestral';
+
+    // Docentes
+    const elDocentes = document.getElementById('modal-turma-docentes');
+    if (elDocentes) {
+      if (turmaObj.docentes && turmaObj.docentes.length > 0) {
+        elDocentes.textContent = turmaObj.docentes.join(', ');
+      } else {
+        elDocentes.textContent = 'Docente a designar';
+      }
+    }
+
+    // Horários Oficiais
+    const elHorarios = document.getElementById('modal-turma-horarios');
+    if (elHorarios) {
+      if (turmaObj.horarios && turmaObj.horarios.length > 0) {
+        let htmlH = '';
+        turmaObj.horarios.forEach(h => {
+          htmlH += `<div class="horario-slot-item">`;
+          htmlH += `  <span class="horario-dia-hora">${escapeHtml(h.dia || '')} • ${escapeHtml(h.inicio || '')} às ${escapeHtml(h.fim || '')}</span>`;
+          htmlH += `</div>`;
+        });
+        elHorarios.innerHTML = htmlH;
+      } else {
+        elHorarios.innerHTML = '<div class="horario-slot-item"><span class="horario-dia-hora">Horários a definir</span></div>';
+      }
+    }
+
+
+    // Observações
+    const elObsContainer = document.getElementById('modal-turma-obs-container');
+    const elObs = document.getElementById('modal-turma-obs');
+    if (elObsContainer && elObs) {
+      if (turmaObj.observacoes && turmaObj.observacoes.trim()) {
+        elObs.textContent = turmaObj.observacoes.trim();
+        elObsContainer.style.display = 'block';
+      } else {
+        elObsContainer.style.display = 'none';
+      }
+    }
+  }
+
+  /**
+   * Fecha o Card Modal e restaura o foco no elemento disparador.
+   */
+  function fecharCardDisciplina() {
+    const modal = document.getElementById('modal-card-disciplina');
+    if (!modal) return;
+
+    modal.classList.remove('aberto');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+
+    // Inicia contagem regressiva de 30 segundos mantendo a célula com tom amarelo
+    if (celulaAtivaInfo) {
+      celulaAtivaInfo.expireAt = Date.now() + 30000;
+      if (timerDestaqueCelulaModal) {
+        clearTimeout(timerDestaqueCelulaModal);
+      }
+      timerDestaqueCelulaModal = setTimeout(function() {
+        if (celulaAtivaModal) {
+          celulaAtivaModal.classList.remove('celula-ativa-modal');
+          celulaAtivaModal = null;
+        }
+        celulaAtivaInfo = null;
+        timerDestaqueCelulaModal = null;
+      }, 30000);
+    }
+
+    if (ultimoElementoFocado && typeof ultimoElementoFocado.focus === 'function') {
+      ultimoElementoFocado.focus();
+      ultimoElementoFocado = null;
+    }
+  }
+
+  /**
+   * Monitora rolagem na tabela para re-priorizar células visíveis com debounce.
+   */
+  function iniciarMonitoramentoScrollGrade() {
+    const containerGrade = document.getElementById('grade-tabela-container');
+    if (!containerGrade) return;
+
+    containerGrade.addEventListener('scroll', function() {
+      if (jupiterTimerDebounceScroll) clearTimeout(jupiterTimerDebounceScroll);
+      jupiterTimerDebounceScroll = setTimeout(extrairCodigosVisiveisEAgendar, 350);
+    }, { passive: true });
   }
 </script>
 

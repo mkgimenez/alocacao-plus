@@ -214,6 +214,103 @@
     <span>Consultas diretas: Graduação (Jupiterweb ↗) • Pós-Graduação (Janus ↗)</span>
   </footer>
 
+  <!-- Modal / Card Elegante de Informações da Disciplina (Jupiterweb) -->
+  <div id="modal-card-disciplina" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-disc-codigo">
+    <div class="modal-card" id="modal-card-conteudo">
+      
+      <!-- Cabeçalho do Card -->
+      <header class="modal-card-cabecalho">
+        <div class="modal-card-titulos">
+          <div class="modal-card-sigla-linha">
+            <span id="modal-disc-codigo" class="modal-disc-sigla">---</span>
+            <span id="modal-disc-nivel" class="badge-modalidade">Graduação</span>
+          </div>
+          <h2 id="modal-disc-nome" class="modal-disc-nome">Carregando informações...</h2>
+        </div>
+        <button type="button" class="modal-btn-fechar" id="modal-btn-fechar-topo" aria-label="Fechar modal" onclick="fecharCardDisciplina()">&times;</button>
+      </header>
+
+      <!-- Estado de Carregamento (Skeleton Shimmer) -->
+      <div id="modal-card-skeleton" class="modal-card-skeleton" style="display: none;">
+        <div class="skeleton-pill"></div>
+        <div class="skeleton-linha"></div>
+        <div class="skeleton-linha curta"></div>
+        <div class="skeleton-bloco"></div>
+      </div>
+
+      <!-- Estado Sem Oferecimento -->
+      <div id="modal-card-sem-oferecimento" class="modal-card-vazio" style="display: none;">
+        <div class="modal-vazio-icone">ℹ️</div>
+        <h3>Sem oferecimento no semestre</h3>
+        <p>Esta disciplina não possui turmas ativas cadastradas no Jupiterweb para o período letivo vigente.</p>
+      </div>
+
+      <!-- Corpo Principal dos Dados da Disciplina -->
+      <div id="modal-card-dados" class="modal-card-corpo">
+        
+        <!-- Seletor de Turmas (Tabs/Pills) -->
+        <div class="modal-seletor-turmas-wrapper">
+          <span class="modal-seletor-label">Turmas:</span>
+          <div id="modal-seletor-turmas" class="modal-seletor-pills" role="tablist">
+            <!-- Pills das turmas geradas dinamicamente -->
+          </div>
+        </div>
+
+        <!-- Painel de Detalhes da Turma Ativa -->
+        <div class="modal-painel-detalhes" id="modal-painel-turma">
+          
+          <!-- Metadados da Turma -->
+          <div class="modal-meta-grid">
+            <div class="modal-meta-item">
+              <span class="modal-meta-rotulo">Código da Turma</span>
+              <span id="modal-turma-codigo" class="modal-meta-valor">---</span>
+            </div>
+            <div class="modal-meta-item">
+              <span class="modal-meta-rotulo">Tipo / Modalidade</span>
+              <span id="modal-turma-tipo" class="modal-meta-valor">---</span>
+            </div>
+            <div class="modal-meta-item">
+              <span class="modal-meta-rotulo">Período de Aulas</span>
+              <span id="modal-turma-periodo" class="modal-meta-valor">---</span>
+            </div>
+          </div>
+
+          <!-- Docentes Responsáveis -->
+          <div class="modal-secao">
+            <h4 class="modal-secao-titulo">👨‍🏫 Docente(s) Responsável(is)</h4>
+            <div id="modal-turma-docentes" class="modal-docentes-lista">---</div>
+          </div>
+
+          <!-- Horários Oficiais Cadastrados no Júpiter -->
+          <div class="modal-secao">
+            <h4 class="modal-secao-titulo">🕒 Horários Oficiais (Júpiter)</h4>
+            <div id="modal-turma-horarios" class="modal-horarios-tabela">
+              <!-- Horários inseridos dinamicamente -->
+            </div>
+          </div>
+
+
+          <!-- Observações da Turma -->
+          <div id="modal-turma-obs-container" class="modal-secao" style="display: none;">
+            <h4 class="modal-secao-titulo">📝 Observações</h4>
+            <p id="modal-turma-obs" class="modal-obs-texto"></p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Rodapé com Ações -->
+      <footer class="modal-card-rodape">
+        <a id="modal-btn-link-jupiter" href="#" target="_blank" rel="noopener noreferrer" class="btn-link-externo-jupiter">
+          Abrir no Jupiterweb ↗
+        </a>
+        <button type="button" class="btn-fechar-modal" onclick="fecharCardDisciplina()">Fechar</button>
+      </footer>
+
+    </div>
+  </div>
+
   <!-- Container de Notificações Toast -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 

@@ -25,9 +25,12 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
   - **Capacidade Mínima:** Filtros numéricos e atalhos rápidos (`30+`, `50+`, `80+` lugares).
   - **🚪 Modo Salas Livres:** Identifica instantaneamente quais salas estão desocupadas no intervalo selecionado.
 - **🔍 Busca Inteligente:** Pesquisa por código de disciplina, nome de docente ou termos livres, com alternância de foco em colunas com resultado.
-- **🔗 Integração com Portais Acadêmicos da USP:**
-  - **Graduação:** Hiperlinks automáticos para turmas no [Jupiterweb](https://uspdigital.usp.br/jupiterweb/).
-  - **Pós-Graduação:** Hiperlinks diretos para o sistema [Janus](https://uspdigital.usp.br/janus/).
+- **🔗 Integração e Enriquecimento com Portais Acadêmicos da USP:**
+  - **Graduação (Jupiterweb):** Enriquecimento progressivo assíncrono em segundo plano (*background worker* com 0ms de impacto na grade):
+    - **No Hover:** Exibe o nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`).
+    - **No Clique:** Abre um **Card Modal Elegante** com seleção de turmas por pills, horários oficiais com docentes e observações.
+    - **Acesso Externo:** Hiperlinks para a página completa no [Jupiterweb](https://uspdigital.usp.br/jupiterweb/) preservados com `Ctrl+Clique` ou botão do meio.
+  - **Pós-Graduação (Janus):** Hiperlinks diretos para o sistema [Janus](https://uspdigital.usp.br/janus/).
 - **⚙️ Parametrização sem Código:** A equipe acadêmica pode alternar IDs de planilhas e tempos de cache via aba `_Config` sem tocar no código-fonte.
 
 ---
@@ -54,10 +57,19 @@ alocacao-plus/
 │
 ├── docs/                          # Documentação e especificações de regras de negócio
 │   ├── especificacao-disciplinas.md # Gramática de códigos de turmas e cores oficiais
+│   ├── especificacao-parser-jupiterweb.md # Especificação técnica do parser Jupiterweb
+│   ├── implementacao-enriquecimento-jupiterweb.md # Histórico de implementação e homologação
 │   ├── sincronizacao-apps-script.md # Guia completo do sincronizador e versionamento
 │   └── adr/                       # Architectural Decision Records (ADRs)
 │       ├── README.md              # Índice cronológico e template de decisões
 │       └── 0001-*.md              # Registros de decisões técnicas individuais
+│
+├── tests/                         # Suíte de testes automatizados e fixtures
+│   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
+│   ├── test_jupiter_parser.py     # Testes do parser HTML e fuzzing sintético
+│   ├── test_turma_matching.py     # Casamento de turmas e property fuzzing
+│   ├── test_queue_logic.py        # Máquina de estados da fila, priorização e concorrência
+│   └── fixtures/                  # Documentos HTML reais salvos do Jupiterweb
 │
 ├── tools/                         # Utilitários locais de diagnóstico e automação
 │   ├── gas_sync.py                # Sincronizador Apps Script REST API v1 e CLI de versão
@@ -145,11 +157,24 @@ Utilize o utilitário nativo [`tools/gas_sync.py`](tools/gas_sync.py) que aprove
 
 ---
 
+## 🧪 Testes Automatizados
+
+O projeto conta com uma suíte de testes unitários e testes baseados em propriedades (*property-based fuzzing*) executados via Python:
+
+```bash
+python tests/run_all_tests.py
+```
+
+- **Cobertura Completa:** Parser HTML do Jupiterweb, decodificação `ISO-8859-1`, casamento de turmas complexas (`T1`, `T1 e T2`, `pv/tv`, eventos) e controle estrito de concorrência da fila assíncrona (1 requisição simultânea em voo).
+- **Resiliência e Estabilidade:** Mais de 2.200 iterações estocásticas de fuzzing para garantir imunidade a HTMLs corrompidos, variações de layout e picos de concorrência.
+
+---
+
 ## 🏛️ Decisões de Arquitetura (ADR)
 
 As decisões de engenharia, restrições superadas da plataforma Google e compensações técnicas (*trade-offs*) estão documentadas na pasta [`docs/adr/`](docs/adr/README.md).
 
-Consulte os registros para entender o histórico da migração da Sidebar para Web App, a estratégia de particionamento de cache para superar o limite de 100KB do Apps Script, a gramática de disciplinas e muito mais.
+Consulte os registros para entender o histórico da migração da Sidebar para Web App, a estratégia de particionamento de cache para superar o limite de 100KB do Apps Script, o enriquecimento progressivo do Jupiterweb (ADR 0013), a gramática de disciplinas e muito mais.
 
 ---
 

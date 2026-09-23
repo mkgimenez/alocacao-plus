@@ -147,5 +147,14 @@ Para enriquecer a grade com links diretos aos detalhes das disciplinas (turmas o
 * **Anulação de Estilos Padrão de Hyperlink:** Links no Google Sheets recebem, por padrão, sublinhado e cor azul (`#1155cc`). O parser do **Plus** anula explicitamente esse comportamento através de `TextStyle`, definindo `.setUnderline(false)` e restaurando a cor de fonte original (`.setForegroundColor(corOriginal)`), além de pesos e famílias tipográficas.
 * Preserva integralmente as mesclagens de horário (aulas com 2 ou mais blocos), cores de fundo, bordas e as cores semânticas da legenda oficial (azul para outras unidades, cereja para avaliações e vermelho para pendências).
 
+### 6.3. Enriquecimento Progressivo com Dados Oficiais do Jupiterweb
+* **Hover:** Exibição do nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`).
+* **Clique:** Abertura do **Card Modal Elegante** contendo seleção de turmas por pills, horários oficiais com docentes e observações.
+* **Atalhos Preservados:** Cliques com teclas modificadoras (`Ctrl+Clique`, `Cmd+Clique`) ou botão do meio abrem diretamente a URL em nova aba.
+* **Documentação Técnica e Decisões de Arquitetura:**
+  * [Especificação do Parser HTML e Charset ISO-8859-1](especificacao-parser-jupiterweb.md)
+  * [ADR 0013 — Enriquecimento Progressivo de Disciplinas com Dados do Jupiterweb](adr/0013-enriquecimento-progressivo-jupiterweb.md)
+  * [Roteiro de Implementação e Histórico de Validação](implementacao-enriquecimento-jupiterweb.md)
+
 ---
 *Documento gerado e versionado para o projeto Alocação Plus.*
