@@ -52,6 +52,9 @@
     configurarDelegacaoEventosGrade();
     configurarEventosModalDisciplina();
     carregarDadosDoBackend();
+
+    // Registra métrica de acesso em segundo plano (assíncrono e silencioso)
+    setTimeout(registrarAcessoSilencioso, 1500);
   });
 
   let timerAtualizacaoSlot = null;
@@ -92,6 +95,82 @@
       .withSuccessHandler(aoReceberDadosGradeSucesso)
       .withFailureHandler(aoFalharCarregamentoGrade)
       .obterDadosGradeWeb(forcarAtualizacao);
+  }
+
+  // --------------------------------------------------------------------------
+  // Telemetria e Estatísticas de Acesso (Nativo, Silencioso e Anônimo)
+  // --------------------------------------------------------------------------
+  function obterIdAnonimoUsuario() {
+    const CHAVE_ID = 'alocacao_plus_uid';
+    let uid = null;
+    try {
+      uid = localStorage.getItem(CHAVE_ID);
+      if (!uid) {
+        uid = 'usr_' + Math.random().toString(36).substring(2, 8) + Date.now().toString(36);
+        localStorage.setItem(CHAVE_ID, uid);
+      }
+    } catch (e) {
+      uid = 'anon_' + Math.random().toString(36).substring(2, 8);
+    }
+    return uid;
+  }
+
+  function classificarTipoVisita() {
+    const CHAVE_ULTIMA_DATA = 'alocacao_plus_ult_data';
+    const hojeStr = new Date().toISOString().split('T')[0];
+    let tipo = 'Primeiro Acesso';
+
+    try {
+      const ultData = localStorage.getItem(CHAVE_ULTIMA_DATA);
+      if (!ultData) {
+        tipo = 'Primeiro Acesso';
+      } else if (ultData !== hojeStr) {
+        tipo = 'Nova Visita Hoje';
+      } else {
+        tipo = 'Recorrente';
+      }
+      localStorage.setItem(CHAVE_ULTIMA_DATA, hojeStr);
+    } catch (e) {
+      tipo = 'Visita';
+    }
+    return tipo;
+  }
+
+  function detectarDispositivo() {
+    const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return isMobile ? 'Mobile' : 'Desktop';
+  }
+
+  function registrarAcessoSilencioso() {
+    try {
+      // Executa apenas quando implantado no Google Apps Script
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        return;
+      }
+
+      // Evita duplicação por reloads rápidos (limite de 1 ping a cada 15 min por sessão/aba)
+      const CHAVE_SESSAO = 'alocacao_plus_ping_sessao';
+      const agoraMs = Date.now();
+      const ultimoPing = sessionStorage.getItem(CHAVE_SESSAO);
+      if (ultimoPing && (agoraMs - parseInt(ultimoPing, 10) < 15 * 60 * 1000)) {
+        return;
+      }
+      sessionStorage.setItem(CHAVE_SESSAO, String(agoraMs));
+
+      const payload = {
+        idAnonimo: obterIdAnonimoUsuario(),
+        tipoVisita: classificarTipoVisita(),
+        dispositivo: detectarDispositivo(),
+        resolucao: (window.screen ? `${window.screen.width}x${window.screen.height}` : `${window.innerWidth}x${window.innerHeight}`)
+      };
+
+      google.script.run
+        .withSuccessHandler(function() {})
+        .withFailureHandler(function() {})
+        .registrarAcessoWeb(payload);
+    } catch (e) {
+      // Silencioso para jamais impactar a experiência de consulta do usuário
+    }
   }
 
   function solicitarRecarregarDados() {

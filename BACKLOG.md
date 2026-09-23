@@ -73,6 +73,13 @@ Exemplo: - [ ] Salvar filtros favoritos no navegador
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.2.0:** Telemetria e Contador de Acessos Nativo no Google Sheets:
+  - Registro silencioso e assíncrono em segundo plano (0ms de impacto no carregamento e renderização da grade);
+  - Identificador anônimo aleatório no `localStorage` para cálculo de visitantes únicos e frequência diária (LGPD-compliant);
+  - Detecção automática de tipo de dispositivo (Mobile vs. Desktop) e resolução de tela;
+  - Proteção de concorrência via `LockService` e debounce de 15 minutos por sessão contra reloads consecutivos;
+  - Criação e formatação automática da aba `_Metricas` na planilha PLUS com fórmulas em tempo real (Total de Consultas, Visitantes Únicos, Acessos Hoje, % Mobile/Desktop);
+  - Adição da opção `📊 Abrir Métricas` no menu oficial `💡 Plus` da planilha.
 - [x] **v1.0.0:** Primeiro grande lançamento oficial estável (*Major Release*):
   - Enriquecimento progressivo assíncrono de disciplinas com dados oficiais do Jupiterweb (USP);
   - Tooltip dinâmico no hover com docente(s) e Card Modal elegante com turmas, vagas, horários oficiais e observações;

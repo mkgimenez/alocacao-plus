@@ -31,12 +31,13 @@ function include(filename) {
 }
 
 /**
- * Cria o menu na planilha ao abrir com apenas as opções essenciais
+ * Cria o menu na planilha ao abrir com opções essenciais
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('💡 Plus')
     .addItem('🌐 Abrir Web App', 'mostrarLinkWebApp')
+    .addItem('📊 Abrir Métricas', 'abrirAbaMetricas')
     .addItem('🧹 Limpar Cache', 'menuLimparCache')
     .addToUi();
 }
@@ -1088,5 +1089,181 @@ function obterLoteJupiterweb(listaCodigos) {
   } catch (err) {
     Logger.log('Erro em obterLoteJupiterweb: ' + err.stack);
     return { sucesso: false, msg: 'Erro ao consultar turmas no Jupiterweb: ' + err.message };
+  }
+}
+
+// ============================================================================
+// 📊 TELEMETRIA E ESTATÍSTICAS DE ACESSO (NATIVO NO GOOGLE SHEETS)
+// ============================================================================
+
+/**
+ * Ativa a aba '_Metricas' na interface do Google Sheets (ou cria caso não exista)
+ */
+function abrirAbaMetricas() {
+  const ss = obterPlanilhaAtivaOuPlus();
+  if (!ss) return;
+  let sheet = ss.getSheetByName('_Metricas');
+  if (!sheet) {
+    sheet = inicializarAbaMetricas(ss);
+  }
+  if (sheet) {
+    ss.setActiveSheet(sheet);
+  }
+}
+
+/**
+ * Retorna a planilha ativa ou abre a planilha PLUS pelo ID oficial
+ */
+function obterPlanilhaAtivaOuPlus() {
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    try {
+      ss = SpreadsheetApp.openById('1ZSa4RmZm0GSiAPrHwE1M1cB1vzI1hdg30bGkTA-R66U');
+    } catch (e) {
+      Logger.log('Aviso: Não foi possível abrir a planilha PLUS por ID: ' + e.message);
+    }
+  }
+  return ss;
+}
+
+/**
+ * Cria ou formata a aba '_Metricas' com dashboard de KPIs e tabela de registros
+ */
+function inicializarAbaMetricas(ss) {
+  if (!ss) ss = obterPlanilhaAtivaOuPlus();
+  if (!ss) return null;
+
+  let sheet = ss.getSheetByName('_Metricas');
+  if (!sheet) {
+    sheet = ss.insertSheet('_Metricas');
+  }
+
+  // Se a aba acabou de ser criada ou está vazia, monta a estrutura completa
+  if (sheet.getLastRow() < 4) {
+    sheet.clear();
+
+    // 1. Painel Resumo / KPIs (Linhas 1 e 2)
+    const kpiTitulos = [['Total de Consultas', 'Visitantes Únicos', 'Acessos Hoje', '% Mobile', '% Desktop']];
+    sheet.getRange(1, 1, 1, 5).setValues(kpiTitulos)
+      .setFontWeight('bold')
+      .setFontSize(9)
+      .setBackground('#f1f5f9')
+      .setFontColor('#475569')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+
+    // Fórmulas em inglês para compatibilidade padrão da API do Apps Script
+    const kpiFormulas = [[
+      '=IF(COUNTA(A5:A)>0, COUNTA(A5:A), 0)',
+      '=IF(COUNTA(F5:F)>0, COUNTUNIQUE(F5:F), 0)',
+      '=IF(COUNTA(B5:B)>0, COUNTIF(B5:B, TEXT(TODAY(), "yyyy-mm-dd")), 0)',
+      '=IF(COUNTA(D5:D)>0, COUNTIF(D5:D, "Mobile") / COUNTA(D5:D), 0)',
+      '=IF(COUNTA(D5:D)>0, COUNTIF(D5:D, "Desktop") / COUNTA(D5:D), 0)'
+    ]];
+    sheet.getRange(2, 1, 1, 5).setFormulas(kpiFormulas)
+      .setFontWeight('bold')
+      .setFontSize(14)
+      .setFontColor('#104880')
+      .setBackground('#ffffff')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+
+    // Formatos numéricos dos KPIs
+    sheet.getRange(2, 1, 1, 3).setNumberFormat('#,##0');
+    sheet.getRange(2, 4, 1, 2).setNumberFormat('0.0%');
+    sheet.setRowHeight(1, 24);
+    sheet.setRowHeight(2, 34);
+    sheet.setRowHeight(3, 14);
+
+    // 2. Cabeçalho da Tabela de Registros (Linha 4)
+    const colunasLog = [['Data e Hora', 'Data', 'Hora', 'Dispositivo', 'Tipo de Visita', 'ID Anônimo', 'Resolução']];
+    sheet.getRange(4, 1, 1, 7).setValues(colunasLog)
+      .setFontWeight('bold')
+      .setFontSize(10)
+      .setBackground('#104880')
+      .setFontColor('#ffffff')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+    sheet.setRowHeight(4, 28);
+
+    // Ajusta largura das colunas para visualização agradável
+    sheet.setColumnWidth(1, 160); // Data e Hora
+    sheet.setColumnWidth(2, 100); // Data
+    sheet.setColumnWidth(3, 80);  // Hora
+    sheet.setColumnWidth(4, 110); // Dispositivo
+    sheet.setColumnWidth(5, 160); // Tipo de Visita
+    sheet.setColumnWidth(6, 170); // ID Anônimo
+    sheet.setColumnWidth(7, 110); // Resolução
+
+    // Congela as primeiras 4 linhas (KPIs + Cabeçalho fixos na rolagem)
+    sheet.setFrozenRows(4);
+  }
+
+  return sheet;
+}
+
+/**
+ * Endpoint backend chamado pelo cliente em background para registrar estatísticas de acesso.
+ * Protegido por LockService para evitar concorrência de escritas simultâneas na planilha.
+ */
+function registrarAcessoWeb(payload) {
+  const lock = LockService.getScriptLock();
+  const temLock = lock.tryLock(2500);
+  if (!temLock) {
+    // Se o lock não foi obtido em 2.5s, encerra silenciosamente
+    return { sucesso: false, motivo: 'timeout_lock' };
+  }
+
+  try {
+    const ss = obterPlanilhaAtivaOuPlus();
+    if (!ss) return { sucesso: false, motivo: 'sem_planilha' };
+
+    let sheet = ss.getSheetByName('_Metricas');
+    if (!sheet) {
+      sheet = inicializarAbaMetricas(ss);
+    }
+    if (!sheet) return { sucesso: false, motivo: 'falha_aba' };
+
+    const dados = payload || {};
+    const agora = new Date();
+    const tz = Session.getScriptTimeZone() || 'America/Sao_Paulo';
+    const dataHoraStr = Utilities.formatDate(agora, tz, 'dd/MM/yyyy HH:mm:ss');
+    const dataStr = Utilities.formatDate(agora, tz, 'yyyy-MM-dd');
+    const horaStr = Utilities.formatDate(agora, tz, 'HH:mm');
+
+    const dispositivo = String(dados.dispositivo || 'Desktop').substring(0, 20);
+    const tipoVisita = String(dados.tipoVisita || 'Visita').substring(0, 30);
+    const idAnonimo = String(dados.idAnonimo || 'anon').substring(0, 50);
+    const resolucao = String(dados.resolucao || '').substring(0, 30);
+
+    sheet.appendRow([
+      dataHoraStr,
+      dataStr,
+      horaStr,
+      dispositivo,
+      tipoVisita,
+      idAnonimo,
+      resolucao
+    ]);
+
+    // Formatação e alinhamento da linha recém-adicionada
+    const ultimaLinha = sheet.getLastRow();
+    if (ultimaLinha >= 5) {
+      sheet.getRange(ultimaLinha, 1, 1, 7)
+        .setFontSize(9)
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('middle');
+      sheet.getRange(ultimaLinha, 5).setHorizontalAlignment('left'); // Tipo de visita
+      sheet.getRange(ultimaLinha, 6).setFontFamily('monospace');     // ID Anônimo
+    }
+
+    return { sucesso: true };
+  } catch (err) {
+    Logger.log('Erro ao registrar métrica de acesso: ' + err.message);
+    return { sucesso: false, erro: err.message };
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (e) {}
   }
 }
