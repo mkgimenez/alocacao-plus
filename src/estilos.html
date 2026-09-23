@@ -1761,6 +1761,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     padding: 12px 20px;
     background: #f8fafc;
     border-top: 1px solid var(--border-color);
@@ -1779,11 +1780,43 @@
     border: 1px solid var(--primary-border);
     background: #ffffff;
     transition: all 0.15s ease;
+    white-space: nowrap;
   }
 
   .btn-link-externo-jupiter:hover {
     background: var(--primary-light);
     border-color: var(--primary);
+  }
+
+  .btn-filtrar-disciplina {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    background: #ffffff;
+    border: 1px solid var(--primary-border);
+    border-radius: 6px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .btn-filtrar-disciplina:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(16, 72, 128, 0.1);
+  }
+
+  .btn-filtrar-disciplina:active {
+    transform: translateY(0);
+    box-shadow: none;
   }
 
   .btn-fechar-modal {
@@ -1796,6 +1829,7 @@
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s ease;
+    white-space: nowrap;
   }
 
   .btn-fechar-modal:hover {
@@ -1821,10 +1855,19 @@
     display: none !important;
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: 540px) {
     .modal-card {
       max-height: 92vh;
       border-radius: 10px;
+    }
+    .modal-card-rodape {
+      flex-direction: column-reverse;
+      gap: 8px;
+    }
+    .modal-card-rodape > * {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
     }
   }
 </style>

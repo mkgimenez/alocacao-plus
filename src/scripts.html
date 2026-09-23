@@ -767,12 +767,48 @@
   }
 
   function celulaCorrespondeABusca(cel, tokens) {
-    if (!cel || !cel.t || !tokens || tokens.length === 0) return false;
+    if (!cel || !tokens || tokens.length === 0) return false;
     if (!cel._tNorm) {
-      cel._tNorm = normalizarTexto(cel.t);
+      cel._tNorm = cel.t ? normalizarTexto(cel.t) : '';
     }
     const texto = cel._tNorm;
-    return tokens.every(t => texto.includes(t));
+    if (texto && tokens.every(t => texto.includes(t))) {
+      return true;
+    }
+
+    // Busca enriquecida nos códigos e metadados oficiais do Jupiterweb (nome e docentes)
+    if (cel.d && Array.isArray(cel.d) && cel.d.length > 0) {
+      for (let i = 0; i < cel.d.length; i++) {
+        const cod = String(cel.d[i]).trim().toUpperCase();
+        if (!cod) continue;
+
+        // Match no código normalizado
+        if (tokens.every(t => cod.toLowerCase().includes(t))) {
+          return true;
+        }
+
+        // Match nos dados do Júpiter em cache (nome da disciplina e docentes)
+        const dados = obterCacheJupiter(cod);
+        if (dados) {
+          if (!dados._buscaNorm) {
+            let acumulador = (dados.nome || '') + ' ' + (dados.codigo || '');
+            if (dados.turmas) {
+              Object.values(dados.turmas).forEach(turma => {
+                if (turma.docentes && Array.isArray(turma.docentes)) {
+                  acumulador += ' ' + turma.docentes.join(' ');
+                }
+              });
+            }
+            dados._buscaNorm = normalizarTexto(acumulador);
+          }
+          if (dados._buscaNorm && tokens.every(t => dados._buscaNorm.includes(t))) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   function salaCorrespondeABusca(sala, linhaCels, slotsAtivos, tokens, termoCompletoNorm) {
@@ -790,7 +826,7 @@
     for (let i = 0; i < slotsAtivos.length; i++) {
       const cIdx = slotsAtivos[i].cIdx;
       const celEfetiva = obterCelulaEfetiva(linhaCels, cIdx);
-      if (celEfetiva && celEfetiva.t) {
+      if (celEfetiva && (celEfetiva.t || celEfetiva.d)) {
         if (celulaCorrespondeABusca(celEfetiva, tokens)) {
           return true;
         }
@@ -986,7 +1022,7 @@
         for (let i = 0; i < slotsIniciais.length; i++) {
           const cIdx = slotsIniciais[i].cIdx;
           const celEfetiva = obterCelulaEfetiva(linhaCels, cIdx);
-          if (celEfetiva && celEfetiva.t && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
+          if (celEfetiva && (celEfetiva.t || celEfetiva.d) && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
             colunasComMatch.add(cIdx);
           }
         }
@@ -1172,8 +1208,9 @@
 
     salasVisiveis.forEach(itemSala => {
       const s = itemSala.sala;
-      const r = itemSala.rIdx;
-      const linhaCels = matrizGrade[r] || [];
+      const rIdx = itemSala.rIdx;
+      const r = rIdx;
+      const linhaCels = matrizGrade[rIdx] || [];
 
       tbodyHtml += `<tr class="linha-grade-sala" data-idx="${r}" data-bloco="${s.bloco}">`;
       tbodyHtml += `<td class="col-fixa-sala" title="${s.nome}"><span class="txt-sala">${s.nome}</span></td>`;
@@ -1968,6 +2005,7 @@
   let celulaAtivaModal = null;
   let celulaAtivaInfo = null;
   let timerDestaqueCelulaModal = null;
+  let codigoAtivoModal = null;
 
   /**
    * Abre o Card Modal Elegante para exibição de detalhes completos da disciplina.
@@ -1975,6 +2013,7 @@
   function abrirCardDisciplina(codigo, turmasSolicitadas, elementoDisparador) {
     if (!codigo) return;
     const cod = String(codigo).trim().toUpperCase();
+    codigoAtivoModal = cod;
 
     ultimoElementoFocado = elementoDisparador || document.activeElement;
 
@@ -1982,6 +2021,10 @@
     if (timerDestaqueCelulaModal) {
       clearTimeout(timerDestaqueCelulaModal);
       timerDestaqueCelulaModal = null;
+    }
+    const celNoDom = document.querySelector('.celula-ativa-modal');
+    if (celNoDom) {
+      celNoDom.classList.remove('celula-ativa-modal');
     }
     if (celulaAtivaModal) {
       celulaAtivaModal.classList.remove('celula-ativa-modal');
@@ -2021,6 +2064,11 @@
     const elLinkExt = document.getElementById('modal-btn-link-jupiter');
     if (elLinkExt) {
       elLinkExt.href = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=' + encodeURIComponent(cod);
+    }
+
+    const btnFiltrar = document.getElementById('modal-btn-filtrar-disciplina');
+    if (btnFiltrar) {
+      btnFiltrar.textContent = 'Filtrar grade por ' + cod;
     }
 
     const dados = obterCacheJupiter(cod);
@@ -2223,6 +2271,10 @@
         clearTimeout(timerDestaqueCelulaModal);
       }
       timerDestaqueCelulaModal = setTimeout(function() {
+        const celNoDom = document.querySelector('.celula-ativa-modal');
+        if (celNoDom) {
+          celNoDom.classList.remove('celula-ativa-modal');
+        }
         if (celulaAtivaModal) {
           celulaAtivaModal.classList.remove('celula-ativa-modal');
           celulaAtivaModal = null;
@@ -2236,6 +2288,37 @@
       ultimoElementoFocado.focus();
       ultimoElementoFocado = null;
     }
+  }
+
+  /**
+   * Filtra a grade horária pela sigla da disciplina exibida no card e fecha o card modal.
+   */
+  function filtrarGradePorEstaDisciplina() {
+    if (!codigoAtivoModal) {
+      const elCod = document.getElementById('modal-disc-codigo');
+      if (elCod && elCod.textContent && elCod.textContent !== '---') {
+        codigoAtivoModal = elCod.textContent.trim().toUpperCase();
+      }
+    }
+    const cod = codigoAtivoModal;
+    if (!cod) {
+      fecharCardDisciplina();
+      return;
+    }
+
+    // Fecha o modal
+    fecharCardDisciplina();
+
+    // Insere a sigla da disciplina no campo de busca e executa a filtragem
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.value = cod;
+      setTimeout(function() {
+        inpBusca.focus();
+        inpBusca.select();
+      }, 50);
+    }
+    aoBuscarSala(cod);
   }
 
   /**
