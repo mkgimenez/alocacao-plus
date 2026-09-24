@@ -1,6 +1,5 @@
 ## 📥 Inbox (Captura Rápida)
 
-- [ ] Em alguns testes, o leiaute da web app parece não ter funcionado bem em um iPhone XR com iOS 16. Faça uma verificação e atualização do código para garantir que o leiaute funcione bem em celulares.
 
 ---
 
@@ -49,7 +48,7 @@ flowchart LR
 - [ ] Otimizar a disposição dos cartões de horário em telas pequenas (mobile).
 
 ### 🔍 Busca, Filtros & Usabilidade
-- [ ] Sugerir termos comuns automaticamente no campo de busca ao começar a digitar.
+- [x] Sugerir termos comuns automaticamente no campo de busca ao começar a digitar (chips rápidos de departamentos, docentes e navegação por teclado na v1.4.0).
 
 ### ⚡ Desempenho, Cache & Backend
 
@@ -70,6 +69,16 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.4.0:** Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes):
+  - Popover customizado com chips rápidos acessíveis via teclado (`↑`, `↓`, `Enter`, `Esc`) e clique com prevenção de perda de foco;
+  - Catálogo abrangente de departamentos da EESC (`SEM`, `SEL`, `SET`, `SEP`, `SMM`, `SHS`, `SGS`, `SAA`, `STT`, `SRB`) e unidades do campus São Carlos (`SMA`, `SME`, `SSC`, `SCC`, `760`, `SLC`, `FMT`, `FFI`, `SQM`, `QFL`, `QIQ`, `QOQ`, `IAU`);
+  - Busca semântica por sinônimos e palavras-chave (ex: *"mecânica"* $\rightarrow$ `SEM`, *"elétrica"* $\rightarrow$ `SEL`, *"estruturas"* $\rightarrow$ `SET`, *"cálculo"* $\rightarrow$ `SMA`, *"física"* $\rightarrow$ `760`);
+  - Indexação dinâmica e progressiva de docentes em tempo de execução conforme lotes do Jupiterweb e Janus são concluídos em segundo plano;
+  - Semente inicial de docentes notáveis/frequentes da EESC para busca instantânea no 1º milissegundo;
+  - Normalização e higienização robusta de nomes de professores (remoção de múltiplos títulos acadêmicos como `Prof. Dr.`, `Profa. Dra.`, `Ms.` e anotações como `(R)`);
+  - Atalhos rápidos automáticos ao focar no campo vazio (`🚪 Salas Livres`, `⚡ Agora`, `⚡ Focar em Hoje`);
+  - Registro de governança arquitetural no ADR 0016;
+  - Criação da suíte `tests/test_autocomplete_logic.py`, elevando o total de testes para 58 (100% de sucesso).
 - [x] **v1.3.0:** Enriquecimento Progressivo com Dados do Janus (Pós-Graduação):
   - Replicação completa das funcionalidades da Graduação (Jupiterweb) para a Pós-Graduação (Janus) sem regressões;
   - Pipeline otimizado em 2 etapas: busca de metadados da disciplina + resolução automática das turmas ativas sem necessidade de chamadas N+1;

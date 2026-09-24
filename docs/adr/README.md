@@ -23,6 +23,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0013](0013-enriquecimento-progressivo-jupiterweb.md) | Enriquecimento Progressivo de Disciplinas com Dados do Jupiterweb | **Aceito** | 2026-09-23 |
 | [0014](0014-padronizacao-botoes-e-micro-animacoes-tateis.md) | Padronização Visual de Botões e Micro-Animações Táteis ("Efeitos Fofinhos") | **Aceito** | 2026-09-24 |
 | [0015](0015-enriquecimento-progressivo-janus.md) | Enriquecimento Progressivo de Disciplinas com Dados do Janus (Pós-Graduação) | **Aceito** | 2026-09-24 |
+| [0016](0016-autocomplete-inteligente-campo-busca.md) | Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes) | **Aceito** | 2026-09-24 |
 
 ---
 

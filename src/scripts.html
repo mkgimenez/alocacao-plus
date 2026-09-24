@@ -51,6 +51,7 @@
     iniciarMonitoramentoScrollGrade();
     configurarDelegacaoEventosGrade();
     configurarEventosModalDisciplina();
+    configurarAutocompleteBusca();
     carregarDadosDoBackend();
 
     // Registra métrica de acesso em segundo plano (assíncrono e silencioso)
@@ -1150,7 +1151,7 @@
     }
   }
 
-  function aoBuscarSala(termo) {
+  function aoBuscarSala(termo, ignorarSugestoes = false) {
     estadoApp.buscaSala = String(termo || '');
     const btnLimpar = document.getElementById('btn-limpar-busca');
     if (btnLimpar) {
@@ -1158,6 +1159,9 @@
     }
     atualizarEstadoBotaoLivres();
     aplicarFiltrosEAtualizarVisualizacao();
+    if (!ignorarSugestoes && typeof atualizarSugestoesBusca === 'function') {
+      atualizarSugestoesBusca(estadoApp.buscaSala);
+    }
   }
 
   function limparBusca() {
@@ -1174,6 +1178,9 @@
     const btnColunas = document.getElementById('btn-toggle-colunas-match');
     if (btnColunas) {
       btnColunas.style.display = 'none';
+    }
+    if (typeof fecharSugestoesBusca === 'function') {
+      fecharSugestoesBusca();
     }
     atualizarEstadoBotaoLivres();
     aplicarFiltrosEAtualizarVisualizacao();
@@ -1216,8 +1223,475 @@
     const btnColunas = document.getElementById('btn-toggle-colunas-match');
     if (btnColunas) btnColunas.style.display = 'none';
 
+    if (typeof fecharSugestoesBusca === 'function') {
+      fecharSugestoesBusca();
+    }
+
     atualizarEstadoBotaoLivres();
     aplicarFiltrosEAtualizarVisualizacao();
+  }
+
+  // --------------------------------------------------------------------------
+  // Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes)
+  // --------------------------------------------------------------------------
+  const CATALOGO_DEPARTAMENTOS = [
+    // EESC (Engenharia de São Carlos)
+    { sigla: 'SEM', nome: 'Engenharia Mecânica', apelido: 'Mecânica', unidade: 'EESC', keywords: ['mecanica', 'projetos', 'termica', 'fluidos', 'materiais', 'manufatura'] },
+    { sigla: 'SEL', nome: 'Engenharia Elétrica e de Computação', apelido: 'Elétrica', unidade: 'EESC', keywords: ['eletrica', 'computacao', 'eletronica', 'telecomunicacoes', 'energia', 'sistemas'] },
+    { sigla: 'SET', nome: 'Engenharia de Estruturas', apelido: 'Estruturas', unidade: 'EESC', keywords: ['estruturas', 'concreto', 'madeira', 'metalicas', 'resistencia', 'estatica'] },
+    { sigla: 'SEP', nome: 'Engenharia de Produção', apelido: 'Produção', unidade: 'EESC', keywords: ['producao', 'gestao', 'economia', 'qualidade', 'logistica', 'operacoes', 'processos'] },
+    { sigla: 'SMM', nome: 'Engenharia de Materiais', apelido: 'Materiais', unidade: 'EESC', keywords: ['materiais', 'metalurgia', 'polimeros', 'ceramicas', 'cristalografia', 'corrosao'] },
+    { sigla: 'SHS', nome: 'Hidráulica e Saneamento', apelido: 'Hidráulica', unidade: 'EESC', keywords: ['hidraulica', 'saneamento', 'ambiental', 'agua', 'esgoto', 'recursos hidricos', 'hidrologia'] },
+    { sigla: 'SGS', nome: 'Geotecnia', apelido: 'Geotecnia', unidade: 'EESC', keywords: ['geotecnia', 'solos', 'fundacoes', 'mecanica dos solos', 'geologia', 'aterros'] },
+    { sigla: 'SAA', nome: 'Engenharia Aeronáutica', apelido: 'Aeronáutica', unidade: 'EESC', keywords: ['aeronautica', 'aeroespacial', 'aerodinamica', 'aeronaves', 'propulsao', 'voo', 'aviacao'] },
+    { sigla: 'STT', nome: 'Engenharia de Transportes', apelido: 'Transportes', unidade: 'EESC', keywords: ['transportes', 'transito', 'ferrovias', 'rodovias', 'aeroportos', 'trafego', 'logistica'] },
+    { sigla: 'SRB', nome: 'Recursos Hídricos e Saneamento Ambiental', apelido: 'Biotecnologia', unidade: 'EESC', keywords: ['biotecnologia', 'biorrecurso', 'saneamento ambiental'] },
+
+    // ICMC (Matemática e Computação)
+    { sigla: 'SMA', nome: 'Matemática', apelido: 'Matemática', unidade: 'ICMC', keywords: ['matematica', 'calculo', 'algebra', 'geometria', 'analise', 'equacoes'] },
+    { sigla: 'SME', nome: 'Estatística e Matemática Aplicada', apelido: 'Estatística', unidade: 'ICMC', keywords: ['estatistica', 'probabilidade', 'analise numerica', 'otimizacao', 'computacao cientifica'] },
+    { sigla: 'SSC', nome: 'Sistemas de Computação', apelido: 'Sistemas Comp.', unidade: 'ICMC', keywords: ['sistemas', 'redes', 'arquitetura', 'hardware', 'computadores', 'microprocessadores'] },
+    { sigla: 'SCC', nome: 'Ciência da Computação', apelido: 'Ciência Comp.', unidade: 'ICMC', keywords: ['algoritmos', 'programacao', 'software', 'inteligencia artificial', 'banco de dados'] },
+
+    // IFSC (Física)
+    { sigla: '760', nome: 'Física Geral e Experimental', apelido: 'Física (760)', unidade: 'IFSC', keywords: ['fisica', 'experimental', 'mecanica classica', 'eletromagnetismo', 'otica', 'termodinamica'] },
+    { sigla: 'SLC', nome: 'Física e Ciências Exatas', apelido: 'Física Exatas', unidade: 'IFSC', keywords: ['fisica', 'ciencias exatas', 'laboratorio de fisica'] },
+    { sigla: 'FMT', nome: 'Física dos Materiais', apelido: 'Física Materiais', unidade: 'IFSC', keywords: ['fisica', 'materiais', 'materia condensada'] },
+    { sigla: 'FFI', nome: 'Física e Informática', apelido: 'Física Informática', unidade: 'IFSC', keywords: ['biofisica', 'computacao fisica', 'informatica biomedica'] },
+
+    // IQSC (Química)
+    { sigla: 'SQM', nome: 'Química e Química Ambiental', apelido: 'Química', unidade: 'IQSC', keywords: ['quimica', 'quimica geral', 'ambiental', 'laboratorio quimica'] },
+    { sigla: 'QFL', nome: 'Físico-Química', apelido: 'Físico-Química', unidade: 'IQSC', keywords: ['fisico-quimica', 'termodinamica', 'cinetica quimica'] },
+    { sigla: 'QIQ', nome: 'Química Inorgânica e Analítica', apelido: 'Química Inorg.', unidade: 'IQSC', keywords: ['inorganica', 'analitica', 'quimica analitica'] },
+    { sigla: 'QOQ', nome: 'Química Orgânica e Biológica', apelido: 'Química Org.', unidade: 'IQSC', keywords: ['organica', 'bioquimica', 'sintese'] },
+
+    // IAU (Arquitetura e Urbanismo)
+    { sigla: 'IAU', nome: 'Arquitetura e Urbanismo', apelido: 'Arquitetura', unidade: 'IAU', keywords: ['arquitetura', 'urbanismo', 'desenho', 'projeto', 'paisagismo', 'historia arquitetura'] }
+  ];
+
+  const DOCENTES_SEMENTE = [
+    { nome: 'Carlos Alberto Fortulan', depto: 'SEM' },
+    { nome: 'Marcelo Becker', depto: 'SEM' },
+    { nome: 'Glauco Augusto de Paula Caurin', depto: 'SEM' },
+    { nome: 'Paulo Seleghim Junior', depto: 'SEM' },
+    { nome: 'Fernando Martini Catalano', depto: 'SEM/SAA' },
+    { nome: 'Zilda de Castro Silveira', depto: 'SEM' },
+    { nome: 'Adriano Almeida Gonçalves Siqueira', depto: 'SEM' },
+    { nome: 'Carlos De Marqui Junior', depto: 'SAA/SEM' },
+    { nome: 'Daniel Varela Magalhães', depto: 'SEM' },
+    { nome: 'Álvaro Manoel de Souza Soares', depto: 'SEM' },
+
+    { nome: 'Carlos Dias Maciel', depto: 'SEL' },
+    { nome: 'Denis Vinicius Coury', depto: 'SEL' },
+    { nome: 'Mario Oleskovicz', depto: 'SEL' },
+    { nome: 'Marcelo Andrade da Costa Vieira', depto: 'SEL' },
+    { nome: 'Eduardo Nobuhiro Asada', depto: 'SEL' },
+    { nome: 'João Paulo do Carmo', depto: 'SEL' },
+    { nome: 'Luís Fernando Costa Alberto', depto: 'SEL' },
+    { nome: 'Mário Alexandre Gazziro', depto: 'SEL' },
+    { nome: 'Sebastião E. Neto da Silva', depto: 'SEL' },
+
+    { nome: 'Sérgio Persival Baroncini Proença', depto: 'SET' },
+    { nome: 'Vladimir Guilherme Haach', depto: 'SET' },
+    { nome: 'Maximiliano dos Santos Anversa', depto: 'SET' },
+    { nome: 'José Samuel Giongo', depto: 'SET' },
+    { nome: 'Jorge Munaiar Neto', depto: 'SET' },
+    { nome: 'Luciana Maria Bonvino Figueiredo', depto: 'SET' },
+    { nome: 'Rodrigo Ribeiro Paccola', depto: 'SET' },
+
+    { nome: 'Aldo Roberto Ometto', depto: 'SEP' },
+    { nome: 'Daisy Aparecida do Carmo Curtolo', depto: 'SEP' },
+    { nome: 'Daniel Capaldo Amaral', depto: 'SEP' },
+    { nome: 'Mateus Cecilio Gerolamo', depto: 'SEP' },
+    { nome: 'Janaina Mascarenhas Hornos da Costa', depto: 'SEP' },
+    { nome: 'Edisio Alves de Aguiar Junior', depto: 'SEP' },
+
+    { nome: 'Carlos Alberto Della Rovere', depto: 'SMM' },
+    { nome: 'Haroldo Cavalcanti Pinto', depto: 'SMM' },
+    { nome: 'Antonio Jorge Abdalla', depto: 'SMM' },
+    { nome: 'Edson Antonio Ticianelli', depto: 'IQSC/SMM' },
+
+    { nome: 'Edson Cezar Wendland', depto: 'SHS' },
+    { nome: 'Maria do Carmo Calijuri', depto: 'SHS' },
+    { nome: 'Rodrigo de Melo Porto', depto: 'SHS' },
+    { nome: 'Lyda Patricia Sabogal Paz', depto: 'SHS' },
+
+    { nome: 'Lázaro Valentin Zuquette', depto: 'SGS' },
+    { nome: 'Tacio Mauro Pereira de Campos', depto: 'SGS' },
+    { nome: 'Maria Eugenia Gimenez Boscov', depto: 'SGS' },
+
+    { nome: 'Alvaro Martins Abdalla', depto: 'SAA' },
+    { nome: 'Hernan Dario Ceron Muñoz', depto: 'SAA' },
+    { nome: 'James Waterhouse', depto: 'SAA' },
+
+    { nome: 'Cira Souza Pitombo', depto: 'STT' },
+    { nome: 'José Leomar Fernandes Júnior', depto: 'STT' },
+    { nome: 'Antônio Nélson Rodrigues da Silva', depto: 'STT' },
+    { nome: 'Ana Paula Camargo Larocca', depto: 'STT' },
+
+    { nome: 'Daniel Smania', depto: 'SMA' },
+    { nome: 'Hildebrando Munhoz Rodrigues', depto: 'SMA' },
+    { nome: 'Alexandre Nolasco de Carvalho', depto: 'SMA' },
+    { nome: 'Ana Claudia Nabarro', depto: 'SMA' },
+    { nome: 'Tiago Picon', depto: 'SMA' },
+    { nome: 'Reginaldo Demarque', depto: 'SMA' },
+
+    { nome: 'Francisco Louzada Neto', depto: 'SME' },
+    { nome: 'Cynthia de Oliveira Lage Ferreira', depto: 'SME' },
+    { nome: 'Juliana Cobre', depto: 'SME' },
+    { nome: 'José Alberto Cuminato', depto: 'SME' },
+
+    { nome: 'Vanderlei Salvador Bagnato', depto: 'IFSC' },
+    { nome: 'Tito José Bonagamba', depto: 'IFSC' },
+    { nome: 'Yvonne Primerano Mascarenhas', depto: 'IFSC' },
+    { nome: 'Luiz Vitor de Souza Filho', depto: 'IFSC' },
+    { nome: 'Euclydes Marega Junior', depto: 'IFSC' }
+  ];
+
+  const mapaDocentesIndexados = new Map();
+  let indiceSugestaoTeclado = -1;
+
+  function normalizarNomeDocente(nomeRaw) {
+    if (!nomeRaw) return '';
+    return String(nomeRaw)
+      .replace(/\s*\([^)]*\)/g, '')
+      .replace(/^(?:(?:Prof(?:a)?|Dr(?:a)?|Ms|Msc)\.?\s*)+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function indexarDocente(nomeRaw, depto, discCodigo) {
+    const nomeLimpo = normalizarNomeDocente(nomeRaw);
+    if (!nomeLimpo || nomeLimpo.length < 3) return;
+    const nomeBaixo = normalizarTexto(nomeLimpo);
+    if (nomeBaixo === 'a designar' || nomeBaixo === '-' || nomeBaixo.startsWith('sem docente')) return;
+
+    if (!mapaDocentesIndexados.has(nomeLimpo)) {
+      mapaDocentesIndexados.set(nomeLimpo, {
+        nome: nomeLimpo,
+        nomeNorm: nomeBaixo,
+        depto: depto || '',
+        disciplinas: new Set()
+      });
+    }
+
+    const reg = mapaDocentesIndexados.get(nomeLimpo);
+    if (depto && !reg.depto) reg.depto = depto;
+    if (discCodigo) reg.disciplinas.add(discCodigo);
+  }
+
+  function inicializarIndiceDocentes() {
+    // 1. Carrega semente inicial
+    DOCENTES_SEMENTE.forEach(d => {
+      indexarDocente(d.nome, d.depto, null);
+    });
+
+    // 2. Extrai de itens já em cache (Jupiterweb e Janus)
+    if (estadoApp.cacheJupiter) {
+      Object.keys(estadoApp.cacheJupiter).forEach(cod => {
+        indexarDocentesDeDadosDisciplina(cod, estadoApp.cacheJupiter[cod]);
+      });
+    }
+  }
+
+  function indexarDocentesDeDadosDisciplina(codigo, dados) {
+    if (!dados || !dados.turmas) return;
+    const depto = /^[A-Za-z]{3}/.test(codigo) ? codigo.substring(0, 3).toUpperCase() : '';
+    const turmasObjs = Object.values(dados.turmas);
+    turmasObjs.forEach(t => {
+      if (t.docentes && Array.isArray(t.docentes)) {
+        t.docentes.forEach(d => indexarDocente(d, depto, codigo));
+      }
+      if (t.horarios && Array.isArray(t.horarios)) {
+        t.horarios.forEach(h => {
+          if (h.docente) indexarDocente(h.docente, depto, codigo);
+          if (h.professores && Array.isArray(h.professores)) {
+            h.professores.forEach(p => indexarDocente(p, depto, codigo));
+          }
+        });
+      }
+    });
+  }
+
+  function buscarSugestoes(termo) {
+    const termoStr = String(termo || '').trim();
+    if (!termoStr) {
+      return {
+        termo: '',
+        ehVazio: true,
+        departamentos: CATALOGO_DEPARTAMENTOS.slice(0, 6),
+        docentes: [],
+        acoesRapidas: [
+          { rotulo: '🚪 Salas Livres', acao: 'livres' },
+          { rotulo: '⚡ Horário de Agora', acao: 'agora' },
+          { rotulo: '⚡ Focar em Hoje', acao: 'hoje' }
+        ]
+      };
+    }
+
+    const tNorm = normalizarTexto(termoStr);
+
+    // 1. Departamentos
+    const deptosEncontrados = [];
+    CATALOGO_DEPARTAMENTOS.forEach(dep => {
+      const sNorm = normalizarTexto(dep.sigla);
+      const nNorm = normalizarTexto(dep.nome);
+      const aNorm = normalizarTexto(dep.apelido);
+      let pontuacao = 0;
+
+      if (sNorm === tNorm) {
+        pontuacao = 100;
+      } else if (sNorm.startsWith(tNorm)) {
+        pontuacao = 80;
+      } else if (sNorm.includes(tNorm)) {
+        pontuacao = 60;
+      } else if (aNorm.startsWith(tNorm) || nNorm.startsWith(tNorm)) {
+        pontuacao = 50;
+      } else if (aNorm.includes(tNorm) || nNorm.includes(tNorm)) {
+        pontuacao = 40;
+      } else if (dep.keywords && dep.keywords.some(k => normalizarTexto(k).includes(tNorm))) {
+        pontuacao = 30;
+      }
+
+      if (pontuacao > 0) {
+        deptosEncontrados.push({ ...dep, pontuacao });
+      }
+    });
+
+    deptosEncontrados.sort((a, b) => b.pontuacao - a.pontuacao);
+
+    // 2. Docentes
+    const docentesEncontrados = [];
+    mapaDocentesIndexados.forEach(doc => {
+      let pontuacao = 0;
+      const partesNome = doc.nomeNorm.split(/\s+/);
+
+      if (doc.nomeNorm.startsWith(tNorm)) {
+        pontuacao = 80;
+      } else if (partesNome.some(p => p.startsWith(tNorm))) {
+        pontuacao = 60;
+      } else if (doc.nomeNorm.includes(tNorm)) {
+        pontuacao = 40;
+      }
+
+      if (pontuacao > 0) {
+        docentesEncontrados.push({
+          nome: doc.nome,
+          depto: doc.depto,
+          pontuacao: pontuacao
+        });
+      }
+    });
+
+    docentesEncontrados.sort((a, b) => b.pontuacao - a.pontuacao);
+
+    return {
+      termo: termoStr,
+      ehVazio: false,
+      departamentos: deptosEncontrados.slice(0, 6),
+      docentes: docentesEncontrados.slice(0, 6),
+      acoesRapidas: []
+    };
+  }
+
+  function atualizarSugestoesBusca(termo) {
+    const popover = document.getElementById('busca-sugestoes-dropdown');
+    if (!popover) return;
+
+    const res = buscarSugestoes(termo);
+    const temDeptos = res.departamentos.length > 0;
+    const temDocs = res.docentes.length > 0;
+    const temAcoes = (res.acoesRapidas && res.acoesRapidas.length > 0);
+
+    if (!temDeptos && !temDocs && !temAcoes) {
+      fecharSugestoesBusca();
+      return;
+    }
+
+    let html = '';
+
+    if (temAcoes) {
+      html += `
+        <div class="sugestoes-secao">
+          <div class="sugestoes-secao-header">
+            <span class="sugestoes-secao-titulo"><span>⚡</span> Atalhos Rápidos</span>
+          </div>
+          <div class="sugestoes-chips-grid">
+            ${res.acoesRapidas.map(a => `
+              <button type="button" class="chip-sugestao chip-acao-rapida" data-valor="${a.acao}" data-tipo="acao">
+                ${escapeHtml(a.rotulo)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    if (temDeptos) {
+      const tituloSecao = res.ehVazio ? 'Departamentos Frequentes' : 'Departamentos';
+      html += `
+        <div class="sugestoes-secao">
+          <div class="sugestoes-secao-header">
+            <span class="sugestoes-secao-titulo"><span>🏛️</span> ${tituloSecao}</span>
+            <span class="sugestoes-secao-count">${res.departamentos.length}</span>
+          </div>
+          <div class="sugestoes-chips-grid">
+            ${res.departamentos.map(d => `
+              <button type="button" class="chip-sugestao chip-depto" data-valor="${d.sigla}" data-tipo="depto" title="${escapeHtml(d.nome)} (${d.unidade})">
+                <span class="chip-sugestao-sigla">${d.sigla}</span>
+                <span class="chip-sugestao-rotulo">${escapeHtml(d.apelido)}</span>
+                <span class="chip-sugestao-tag">${d.unidade}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    if (temDocs) {
+      html += `
+        <div class="sugestoes-secao">
+          <div class="sugestoes-secao-header">
+            <span class="sugestoes-secao-titulo"><span>👨‍🏫</span> Docentes</span>
+            <span class="sugestoes-secao-count">${res.docentes.length}</span>
+          </div>
+          <div class="sugestoes-chips-grid">
+            ${res.docentes.map(doc => `
+              <button type="button" class="chip-sugestao chip-docente" data-valor="${escapeHtml(doc.nome)}" data-tipo="docente" title="Buscar aulas de ${escapeHtml(doc.nome)}">
+                <span class="chip-sugestao-icone">👨‍🏫</span>
+                <span class="chip-sugestao-rotulo">${escapeHtml(doc.nome)}</span>
+                ${doc.depto ? `<span class="chip-sugestao-tag">${escapeHtml(doc.depto)}</span>` : ''}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="sugestoes-rodape">
+        <span>Use <kbd>↑</kbd> <kbd>↓</kbd> para navegar e <kbd>Enter</kbd> para escolher</span>
+        <span><kbd>Esc</kbd> para fechar</span>
+      </div>
+    `;
+
+    popover.innerHTML = html;
+    popover.style.display = 'flex';
+    indiceSugestaoTeclado = -1;
+
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  function fecharSugestoesBusca() {
+    const popover = document.getElementById('busca-sugestoes-dropdown');
+    if (popover) {
+      popover.style.display = 'none';
+      popover.innerHTML = '';
+    }
+    indiceSugestaoTeclado = -1;
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function selecionarSugestao(valor, tipo) {
+    if (tipo === 'acao') {
+      fecharSugestoesBusca();
+      if (valor === 'livres') {
+        alternarModoApenasLivres();
+      } else if (valor === 'agora') {
+        selecionarHorarioAgora();
+      } else if (valor === 'hoje') {
+        selecionarHoje();
+      }
+      return;
+    }
+
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.value = valor;
+      inpBusca.focus();
+    }
+    fecharSugestoesBusca();
+    aoBuscarSala(valor, true);
+  }
+
+  function configurarAutocompleteBusca() {
+    inicializarIndiceDocentes();
+
+    const inpBusca = document.getElementById('input-busca-sala');
+    const popover = document.getElementById('busca-sugestoes-dropdown');
+    if (!inpBusca || !popover) return;
+
+    inpBusca.addEventListener('focus', function() {
+      atualizarSugestoesBusca(this.value);
+    });
+
+    inpBusca.addEventListener('input', function() {
+      atualizarSugestoesBusca(this.value);
+    });
+
+    popover.addEventListener('mousedown', function(e) {
+      const chip = e.target.closest('.chip-sugestao');
+      if (chip) {
+        e.preventDefault();
+      }
+    });
+
+    popover.addEventListener('click', function(e) {
+      const chip = e.target.closest('.chip-sugestao');
+      if (chip) {
+        const valor = chip.dataset.valor;
+        const tipo = chip.dataset.tipo;
+        selecionarSugestao(valor, tipo);
+      }
+    });
+
+    inpBusca.addEventListener('keydown', function(e) {
+      if (popover.style.display === 'none') {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          atualizarSugestoesBusca(this.value);
+          e.preventDefault();
+        }
+        return;
+      }
+
+      const chips = Array.from(popover.querySelectorAll('.chip-sugestao'));
+      if (chips.length === 0) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'Tab') {
+        e.preventDefault();
+        chips.forEach(c => c.classList.remove('selecionado-teclado'));
+        indiceSugestaoTeclado = (indiceSugestaoTeclado + 1) % chips.length;
+        chips[indiceSugestaoTeclado].classList.add('selecionado-teclado');
+        chips[indiceSugestaoTeclado].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        chips.forEach(c => c.classList.remove('selecionado-teclado'));
+        indiceSugestaoTeclado = (indiceSugestaoTeclado - 1 + chips.length) % chips.length;
+        chips[indiceSugestaoTeclado].classList.add('selecionado-teclado');
+        chips[indiceSugestaoTeclado].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        if (indiceSugestaoTeclado >= 0 && chips[indiceSugestaoTeclado]) {
+          e.preventDefault();
+          const chipSel = chips[indiceSugestaoTeclado];
+          selecionarSugestao(chipSel.dataset.valor, chipSel.dataset.tipo);
+        }
+      } else if (e.key === 'Escape') {
+        fecharSugestoesBusca();
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      const wrapper = document.getElementById('busca-sala-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        fecharSugestoesBusca();
+      }
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -2012,6 +2486,17 @@
 
     // Atualiza links visíveis no DOM
     atualizarEnriquecimentoCelulasVisiveis(lote);
+
+    // Indexa dinamicamente quaisquer novos docentes recebidos no lote
+    if (dadosRecebidos && typeof indexarDocentesDeDadosDisciplina === 'function') {
+      Object.keys(dadosRecebidos).forEach(cod => {
+        indexarDocentesDeDadosDisciplina(cod, dadosRecebidos[cod]);
+      });
+      const inpBusca = document.getElementById('input-busca-sala');
+      if (inpBusca && document.activeElement === inpBusca && typeof atualizarSugestoesBusca === 'function') {
+        atualizarSugestoesBusca(inpBusca.value);
+      }
+    }
 
     // Se houver busca ativa, reaplica os filtros para atualizar salas e destaques imediatamente
     if (estadoApp.buscaSala && estadoApp.buscaSala.trim()) {

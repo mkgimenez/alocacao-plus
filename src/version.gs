@@ -3,7 +3,7 @@
  * Arquivo gerado automaticamente pelo gas_sync.py - Não edite manualmente.
  */
 
-const APP_VERSION = 'v1.3.1';
+const APP_VERSION = 'v1.4.0';
 const APP_BUILD = 0;
-const APP_BUILD_TIME = '24/09/2026 16:57';
-const APP_FULL_VERSION = 'v1.3.1 (build 0)';
+const APP_BUILD_TIME = '24/09/2026 17:16';
+const APP_FULL_VERSION = 'v1.4.0 (build 0)';

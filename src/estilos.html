@@ -611,6 +611,8 @@
     .btn-filtrar-disciplina,
     .btn-fechar-modal,
     .modal-btn-fechar,
+    .chip-sugestao,
+    .busca-sugestoes-popover,
     .celula-aula a,
     .celula-pos a,
     .link-disc {
@@ -818,6 +820,207 @@
   .btn-limpar-busca:active {
     transform: scale(0.9);
     transition-duration: 0.05s;
+  }
+
+  /* --------------------------------------------------------------------------
+     Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes)
+     -------------------------------------------------------------------------- */
+  .busca-sugestoes-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 380px;
+    max-width: 90vw;
+    background: #ffffff;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 25px -5px rgba(16, 72, 128, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    z-index: 1050;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 380px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation: fadeInDropdown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes fadeInDropdown {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .sugestoes-secao {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sugestoes-secao + .sugestoes-secao {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 8px;
+  }
+
+  .sugestoes-secao-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-subtle);
+    padding: 0 2px;
+  }
+
+  .sugestoes-secao-titulo {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .sugestoes-secao-count {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .sugestoes-chips-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Chip Base de Sugestão */
+  .chip-sugestao {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--text-main);
+    line-height: 1.25;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .chip-sugestao:hover,
+  .chip-sugestao.selecionado-teclado {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(16, 72, 128, 0.12);
+  }
+
+  .chip-sugestao:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 2px rgba(16, 72, 128, 0.15);
+    transition-duration: 0.05s;
+  }
+
+  /* Departamentos */
+  .chip-sugestao-sigla {
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+    color: #104880;
+    background: #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .chip-sugestao:hover .chip-sugestao-sigla,
+  .chip-sugestao.selecionado-teclado .chip-sugestao-sigla {
+    background: #104880;
+    color: #ffffff;
+  }
+
+  .chip-sugestao-rotulo {
+    font-weight: 500;
+  }
+
+  .chip-sugestao-tag {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  /* Docentes */
+  .chip-sugestao.chip-docente {
+    background: #ffffff;
+    border-color: #e2e8f0;
+  }
+
+  .chip-sugestao.chip-docente:hover,
+  .chip-sugestao.chip-docente.selecionado-teclado {
+    background: #f0fdf4;
+    border-color: #22c55e;
+    color: #15803d;
+    box-shadow: 0 2px 6px rgba(34, 197, 94, 0.15);
+  }
+
+  .chip-sugestao.chip-docente .chip-sugestao-icone {
+    font-size: 12px;
+  }
+
+  /* Ações Rápidas */
+  .chip-sugestao.chip-acao-rapida {
+    background: #fefce8;
+    border-color: #fde047;
+    color: #854d0e;
+  }
+
+  .chip-sugestao.chip-acao-rapida:hover,
+  .chip-sugestao.chip-acao-rapida.selecionado-teclado {
+    background: #fef08a;
+    border-color: #eab308;
+    color: #713f12;
+  }
+
+  /* Rodapé com Dicas de Teclado */
+  .sugestoes-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #94a3b8;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 6px;
+    margin-top: 2px;
+  }
+
+  .sugestoes-rodape kbd {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 9.5px;
+    font-family: var(--font-mono, monospace);
   }
 
   .btn-colunas-match {
@@ -1355,8 +1558,9 @@
       flex-direction: column;
       align-items: stretch;
     }
-    .busca-sala-wrapper, .input-busca {
+    .busca-sala-wrapper, .input-busca, .busca-sugestoes-popover {
       width: 100%;
+      max-width: 100%;
     }
   }
 
