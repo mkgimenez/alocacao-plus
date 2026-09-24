@@ -398,6 +398,21 @@ function parsearHtmlJupiterweb(codigo, html) {
     const mFim = chunk.match(/Fim:[\s\S]*?<td[^>]*>[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
     if (mFim) fim = mFim[1];
 
+    // Período (Semestral ou Anual)
+    let periodo = 'Semestral';
+    if (inicio && fim) {
+      const pIni = inicio.split('/');
+      const pFim = fim.split('/');
+      if (pIni.length === 3 && pFim.length === 3) {
+        const dtIni = new Date(parseInt(pIni[2], 10), parseInt(pIni[1], 10) - 1, parseInt(pIni[0], 10));
+        const dtFim = new Date(parseInt(pFim[2], 10), parseInt(pFim[1], 10) - 1, parseInt(pFim[0], 10));
+        const diffDias = (dtFim - dtIni) / (1000 * 60 * 60 * 24);
+        if (diffDias > 185) {
+          periodo = 'Anual';
+        }
+      }
+    }
+
     // Tipo da Turma
     let tipoTurma = 'Teórica';
     const mTipo = chunk.match(/Tipo\s+da\s+Turma:[\s\S]*?<td[^>]*><font[^>]*><span[^>]*>\s*([^\s<]+)/i);
@@ -478,6 +493,7 @@ function parsearHtmlJupiterweb(codigo, html) {
       codigoTurma: codTurma,
       numero: numTurma,
       tipo: tipoTurma,
+      periodo: periodo,
       inicio: inicio,
       fim: fim,
       docentes: docentesLista,
@@ -532,7 +548,7 @@ function extrairInfoTurmaDaCelula(textoCelula) {
   }
 
   const turmas = [];
-  const padraoTurma = /(?:-\s*)?T\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*(\d{1,2}))?/;
+  const padraoTurma = /(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?/i;
   const matchTurma = texto.match(padraoTurma);
   if (matchTurma) {
     if (matchTurma[1]) turmas.push(matchTurma[1].padStart(2, '0'));

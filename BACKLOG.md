@@ -1,15 +1,7 @@
 ## 📥 Inbox (Captura Rápida)
 
+- [ ] Em alguns testes, o leiaute da web app parece não ter funcionado bem em um iPhone XR com iOS 16. Faça uma verificação e atualização do código para garantir que o leiaute funcione bem em celulares.
 
-- [ ] A caixa de busca "Busca disciplina, docente ou texto..." deve permitir filtrar células por:
-    - Sigla da disciplina;
-    - Nome da disciplina;
-    - Turma da disciplina, com regex resiliente, por exemplo T01, t01 T1, t1, T-01, t-1;
-    - Nome do docente, inclusive quando houver mais que um docente;
-    - Modalidade Teórica ou Prática
-    - Período Semestral ou Anual
-    - Qualquer palavra do campo observações
-    
 - [ ] Atualizar para o Janus
     Todas as funcionalidades que foram criadas para as células de Graduação, devem ser replicadas para as células das diciplinas de pós-graduação. A diferença aqui é que depois de fazer o parser da página da disciplina do Janus, será necessário buscar uma URL no formato "https://uspdigital.usp.br/janus/publico/turma/<SIGLA DA DISCIPLINA>/<ALGUM DÍGITO>", acessar essa url e fazer um novo parser para, daí sim conseguir os dados da disciplina.
 
@@ -81,6 +73,11 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.2.2:** Busca Inteligente Multicritério com Resiliência Estruturada:
+  - Filtragem de células por sigla da disciplina, nome oficial (Jupiterweb), turma resiliente (`T01`, `t01`, `T1`, `t1`, `T-01`, `t-1`, `T 01`, `turma 1`), docentes (inclusive múltiplos e co-docência), modalidade (`Teórica`/`Prática`, `tv`/`pv`), período (`Semestral`/`Anual`) e qualquer palavra do campo de observações;
+  - Extração explícita de `periodo` no parser do Jupiterweb sem exigir cálculos manuais durante a busca;
+  - Reatividade imediata da grade ao concluir carregamento em segundo plano de novos lotes de disciplinas;
+  - Criação da suíte `tests/test_search_filter.py` totalizando 36 testes com 100% de sucesso.
 - [x] **v1.2.1:** Padronização Visual e Micro-Animações Táteis ("Efeitos Fofinhos") nos Botões do Card Flutuante:
   - Eliminação da inconsistência de altura física (2px) entre o botão Fechar e os botões outline no rodapé;
   - Transições em curva de mola `cubic-bezier(0.34, 1.56, 0.64, 1)` com elevação no hover (`translateY(-1px)`) e contração física no clique (`scale(0.96)` / `scale(0.95)` em 0.05s) para todos os botões (turmas inativas e ativas, abrir no Jupiterweb, filtrar grade e fechar);

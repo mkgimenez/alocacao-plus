@@ -141,10 +141,23 @@ def parsear_html_jupiterweb(codigo, html):
 
         docentes_lista = sorted(list(docentes_set)) if docentes_set else ["A Designar"]
 
+        # Período: Semestral ou Anual
+        periodo = "Semestral"
+        if inicio and fim:
+            try:
+                from datetime import datetime
+                d_ini = datetime.strptime(inicio, "%d/%m/%Y")
+                d_fim = datetime.strptime(fim, "%d/%m/%Y")
+                if (d_fim - d_ini).days > 185:
+                    periodo = "Anual"
+            except Exception:
+                pass
+
         turmas[num_turma] = {
             "codigoTurma": cod_turma,
             "numero": num_turma,
             "tipo": tipo_turma,
+            "periodo": periodo,
             "inicio": inicio,
             "fim": fim,
             "docentes": docentes_lista,
@@ -240,6 +253,12 @@ class TestJupiterParser(unittest.TestCase):
 
         self.assertTrue(dados["semOferecimento"])
         self.assertEqual(len(dados["turmas"]), 0)
+
+    def test_parse_periodo_semestral(self):
+        """Valida extração correta de período Semestral."""
+        dados = parsear_html_jupiterweb("SMA0356", self.html_sma0356)
+        self.assertIn("01", dados["turmas"])
+        self.assertEqual(dados["turmas"]["01"]["periodo"], "Semestral")
 
     def test_parse_fuzzing_estabilidade(self):
         """Fuzzing com 200 documentos HTML aleatórios e corrompidos garantindo 0 exceções."""

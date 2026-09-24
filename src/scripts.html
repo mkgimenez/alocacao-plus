@@ -845,49 +845,219 @@
     return null;
   }
 
+  /**
+   * Extrai e unifica tokens da busca, tratando padrões como 't 01', 't - 1', 'turma 01'
+   */
+  function extrairTokensBusca(termoNorm) {
+    if (!termoNorm) return [];
+    const tratado = String(termoNorm).replace(/\b(?:turma|t)\s*[\-_]?\s*(\d{1,2})\b/gi, 't$1');
+    return tratado.split(/\s+/).filter(Boolean);
+  }
+
+  /**
+   * Identifica se um token de busca refere-se a uma turma (ex: T01, t01, T1, t1, T-01, t-1, t 01, turma 1)
+   * Retorna o número inteiro da turma (ex: 1) ou null se não for padrão de turma.
+   */
+  function extrairNumeroTurmaBusca(token) {
+    if (!token) return null;
+    const m = String(token).trim().match(/^(?:turma\s*|t\s*[\-_]?\s*)0*(\d{1,2})$/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  /**
+   * Verifica se uma célula atende a todos os tokens da busca textual,
+   * considerando sigla, nome da disciplina, turma com regex resiliente,
+   * docentes (inclusive múltiplos/co-docência), modalidade (direto do card: Teórica/Prática),
+   * período (direto do card: Semestral/Anual) e qualquer palavra das observações.
+   */
   function celulaCorrespondeABusca(cel, tokens) {
     if (!cel || !tokens || tokens.length === 0) return false;
-    if (!cel._tNorm) {
-      cel._tNorm = cel.t ? normalizarTexto(cel.t) : '';
-    }
-    const texto = cel._tNorm;
-    if (texto && tokens.every(t => texto.includes(t))) {
-      return true;
+
+    // Inicializa metadados estáticos da célula em cache de execução
+    if (!cel._metaBusca) {
+      cel._tNorm = normalizarTexto(cel.t || '');
+      const nums = [];
+      if (cel.turmas && Array.isArray(cel.turmas)) {
+        cel.turmas.forEach(t => {
+          const n = parseInt(t, 10);
+          if (!isNaN(n) && !nums.includes(n)) nums.push(n);
+        });
+      }
+      if (nums.length === 0 && cel.t) {
+        const reT = /(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})/gi;
+        let mT;
+        while ((mT = reT.exec(cel.t)) !== null) {
+          const n = parseInt(mT[1], 10);
+          if (!isNaN(n) && !nums.includes(n)) nums.push(n);
+        }
+      }
+      cel._turmasNums = nums;
+      cel._temTurma = nums.length > 0;
+      cel._temTv = /\btv\b/i.test(cel.t || '') || /teoric/i.test(cel.t || '');
+      cel._temPv = /\bpv\b/i.test(cel.t || '') || /pratic/i.test(cel.t || '');
+      cel._codsNorm = (cel.d || []).map(c => normalizarTexto(c));
+      cel._metaBusca = true;
     }
 
-    // Busca enriquecida nos códigos e metadados oficiais do Jupiterweb (nome e docentes)
-    if (cel.d && Array.isArray(cel.d) && cel.d.length > 0) {
+    // Coleta dados das disciplinas da célula (cache do Jupiterweb)
+    const dadosLista = [];
+    if (cel.d && Array.isArray(cel.d)) {
       for (let i = 0; i < cel.d.length; i++) {
         const cod = String(cel.d[i]).trim().toUpperCase();
-        if (!cod) continue;
-
-        // Match no código normalizado
-        if (tokens.every(t => cod.toLowerCase().includes(t))) {
-          return true;
-        }
-
-        // Match nos dados do Júpiter em cache (nome da disciplina e docentes)
-        const dados = obterCacheJupiter(cod);
-        if (dados) {
-          if (!dados._buscaNorm) {
-            let acumulador = (dados.nome || '') + ' ' + (dados.codigo || '');
-            if (dados.turmas) {
-              Object.values(dados.turmas).forEach(turma => {
-                if (turma.docentes && Array.isArray(turma.docentes)) {
-                  acumulador += ' ' + turma.docentes.join(' ');
-                }
-              });
-            }
-            dados._buscaNorm = normalizarTexto(acumulador);
-          }
-          if (dados._buscaNorm && tokens.every(t => dados._buscaNorm.includes(t))) {
-            return true;
-          }
+        if (cod) {
+          const dados = obterCacheJupiter(cod);
+          if (dados) dadosLista.push(dados);
         }
       }
     }
 
-    return false;
+    // Identifica as turmas relevantes para esta célula a partir do Júpiterweb
+    const turmasRelevantes = [];
+    let todasTurmasJupiter = [];
+
+    dadosLista.forEach(dados => {
+      if (dados.turmas) {
+        const turmasObjs = Object.values(dados.turmas);
+        todasTurmasJupiter = todasTurmasJupiter.concat(turmasObjs);
+
+        if (cel._temTurma) {
+          const casadas = turmasObjs.filter(t => {
+            const numT = parseInt(t.numero, 10);
+            if (cel._turmasNums.includes(numT)) return true;
+            if (t.codigoTurma) {
+              return cel._turmasNums.some(n => t.codigoTurma.endsWith(String(n).padStart(2, '0')));
+            }
+            return false;
+          });
+          if (casadas.length > 0) {
+            turmasRelevantes.push(...casadas);
+          } else {
+            turmasRelevantes.push(...turmasObjs);
+          }
+        } else {
+          turmasRelevantes.push(...turmasObjs);
+        }
+      }
+    });
+
+    const turmasParaBusca = turmasRelevantes.length > 0 ? turmasRelevantes : todasTurmasJupiter;
+
+    // Avalia se CADA token é satisfeito pela célula
+    return tokens.every(tok => {
+      // 1. Token de Turma Resiliente (ex: T01, t01, T1, t1, T-01, t-1, etc.)
+      const numTurmaBusca = extrairNumeroTurmaBusca(tok);
+      if (numTurmaBusca !== null) {
+        if (cel._temTurma) {
+          return cel._turmasNums.includes(numTurmaBusca);
+        }
+        // Se a célula não tem turma explícita no texto/objeto
+        if (cel.t) {
+          const reNum = new RegExp('(?:^|[^\\w])(?:turma\\s*|t\\s*[\\-_]?\\s*)0*' + numTurmaBusca + '(?:\\b|[^\\d])', 'i');
+          if (reNum.test(cel.t)) return true;
+        }
+        // Se a célula é puramente a sigla sem turma (ex: SMA0300), verifica se existe a turma no Júpiter
+        if (turmasParaBusca.length > 0) {
+          return turmasParaBusca.some(t => parseInt(t.numero, 10) === numTurmaBusca);
+        }
+        return false;
+      }
+
+      // 2. Token de Modalidade (diretamente como no Card: tipo || 'Teórica')
+      const ehTeoricaToken = (tok === 'teorica' || tok === 'teorico' || tok === 'teoricas' || tok === 'teoricos' || tok === 'tv');
+      const ehPraticaToken = (tok === 'pratica' || tok === 'pratico' || tok === 'praticas' || tok === 'praticos' || tok === 'pv');
+
+      if (ehTeoricaToken) {
+        if (cel._temTv) return true;
+        if (turmasParaBusca.some(t => {
+          const tipoNorm = normalizarTexto(t.tipo || 'Teórica');
+          return tipoNorm.includes('teor') || tipoNorm.includes('te');
+        })) return true;
+      }
+
+      if (ehPraticaToken) {
+        if (cel._temPv) return true;
+        if (turmasParaBusca.some(t => {
+          const tipoNorm = normalizarTexto(t.tipo || 'Teórica');
+          return tipoNorm.includes('prat') || tipoNorm.includes('pr');
+        })) return true;
+      }
+
+      // 3. Token de Período (diretamente como no Card: periodo || 'Semestral')
+      const ehSemestralToken = (tok === 'semestral' || tok === 'semestrais' || tok === 'semestre');
+      const ehAnualToken = (tok === 'anual' || tok === 'anuais' || tok === 'ano');
+
+      if (ehSemestralToken) {
+        if (cel._tNorm.includes('semestr')) return true;
+        if (turmasParaBusca.length > 0 && turmasParaBusca.some(t => {
+          const perNorm = normalizarTexto(t.periodo || 'Semestral');
+          return perNorm.includes('semestr');
+        })) return true;
+      }
+
+      if (ehAnualToken) {
+        if (cel._tNorm.includes('anual') || /\bano\b/.test(cel._tNorm)) return true;
+        if (turmasParaBusca.length > 0 && turmasParaBusca.some(t => {
+          const perNorm = normalizarTexto(t.periodo || 'Semestral');
+          return perNorm.includes('anual');
+        })) return true;
+      }
+
+      // 4. Busca Geral: Sigla, Nome da Disciplina, Docentes (inclusive múltiplos), Observações e Texto da Célula
+      // 4a. Texto cru da célula
+      if (cel._tNorm.includes(tok)) return true;
+
+      // 4b. Códigos de disciplina
+      if (cel._codsNorm.some(c => c.includes(tok))) return true;
+
+      // 4c. Metadados do Jupiterweb
+      for (let i = 0; i < dadosLista.length; i++) {
+        const dados = dadosLista[i];
+        if (!dados) continue;
+
+        // Nome da disciplina
+        if (dados.nome && normalizarTexto(dados.nome).includes(tok)) return true;
+
+        // Código da disciplina
+        if (dados.codigo && normalizarTexto(dados.codigo).includes(tok)) return true;
+      }
+
+      // 4d. Docentes (inclusive múltiplos na mesma turma ou co-docência) e Observações
+      for (let i = 0; i < turmasParaBusca.length; i++) {
+        const turma = turmasParaBusca[i];
+        if (!turma) continue;
+
+        // Docentes
+        if (turma.docentes && Array.isArray(turma.docentes)) {
+          for (let d = 0; d < turma.docentes.length; d++) {
+            if (normalizarTexto(turma.docentes[d]).includes(tok)) {
+              return true;
+            }
+          }
+        }
+
+        // Horários com professores adicionais
+        if (turma.horarios && Array.isArray(turma.horarios)) {
+          for (let h = 0; h < turma.horarios.length; h++) {
+            const hor = turma.horarios[h];
+            if (hor.docente && normalizarTexto(hor.docente).includes(tok)) return true;
+            if (hor.professores && Array.isArray(hor.professores)) {
+              if (hor.professores.some(p => normalizarTexto(p).includes(tok))) return true;
+            }
+          }
+        }
+
+        // Qualquer palavra das Observações
+        if (turma.observacoes && normalizarTexto(turma.observacoes).includes(tok)) {
+          return true;
+        }
+
+        // Tipo e Período (caso o usuário digite texto livre que case com eles)
+        if (turma.tipo && normalizarTexto(turma.tipo).includes(tok)) return true;
+        if (turma.periodo && normalizarTexto(turma.periodo).includes(tok)) return true;
+      }
+
+      return false;
+    });
   }
 
   function salaCorrespondeABusca(sala, linhaCels, slotsAtivos, tokens, termoCompletoNorm) {
@@ -1081,7 +1251,7 @@
     const capMin = estadoApp.capacidadeMin;
     const buscaLimpa = String(estadoApp.buscaSala || '').trim();
     const termoBuscaNorm = normalizarTexto(buscaLimpa);
-    const tokensBusca = termoBuscaNorm.split(/\s+/).filter(Boolean);
+    const tokensBusca = extrairTokensBusca(termoBuscaNorm);
     const temBusca = tokensBusca.length > 0;
     const apenasLivres = estadoApp.apenasLivres && !temBusca;
 
@@ -1779,6 +1949,11 @@
 
     // Atualiza links visíveis no DOM
     atualizarEnriquecimentoCelulasVisiveis(lote);
+
+    // Se houver busca ativa, reaplica os filtros para atualizar salas e destaques imediatamente
+    if (estadoApp.buscaSala && estadoApp.buscaSala.trim()) {
+      aplicarFiltrosEAtualizarVisualizacao();
+    }
 
     // Pausa de alívio de 250ms antes de disparar o próximo lote
     if (jupiterTimerPausa) clearTimeout(jupiterTimerPausa);

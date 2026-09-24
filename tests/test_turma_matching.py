@@ -60,8 +60,8 @@ def extrair_info_turma_celula(texto_celula):
     # Extrai turma(s)
     # Casos: - T1, - T01, - T1 e T2, - T1 e 2, - T10, T2[1], T1 tv, T2 pv
     turmas = []
-    # Busca segmento após "- T" ou "T"
-    padrao_turma = re.search(r'(?:-\s*)?T\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*(\d{1,2}))?', texto)
+    # Busca segmento após "- T" ou "T", aceitando hífen, underscore ou espaço
+    padrao_turma = re.search(r'(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?', texto, re.IGNORECASE)
     if padrao_turma:
         t1 = padrao_turma.group(1)
         turmas.append(t1.zfill(2))
@@ -202,6 +202,11 @@ class TestTurmaMatching(unittest.TestCase):
         self.assertTrue(resultado["sucesso"])
         self.assertEqual(resultado["turma_padrao"], "01")
         self.assertEqual(resultado["label_hover"], "Docente: Ana Claudia Nabarro")
+
+        # Variações resilientes: T-01, t-1, T 01
+        for var in ["SMA0356 - T-01", "SMA0356 - t-1", "SMA0356 - T 01", "SMA0356 - t01"]:
+            inf = extrair_info_turma_celula(var)
+            self.assertEqual(inf["turmas_solicitadas"], ["01"], f"Falhou para variação: {var}")
 
     def test_turmas_compostas(self):
         """Valida célula com turmas compartilhadas (T1 e T2)."""
