@@ -229,6 +229,11 @@
       // Renderiza a grade completa
       renderizarGrade();
 
+      // Indexa disciplinas presentes na grade recém-carregada
+      if (typeof inicializarIndiceDisciplinas === 'function') {
+        inicializarIndiceDisciplinas();
+      }
+
       // Se foi uma solicitação manual, exibe a notificação Toast de sucesso
       if (eraRecarregamentoManual) {
         exibirToast(
@@ -1349,7 +1354,39 @@
   ];
 
   const mapaDocentesIndexados = new Map();
+  const mapaDisciplinasIndexadas = new Map();
   let indiceSugestaoTeclado = -1;
+
+  const DISCIPLINAS_SEMENTE = [
+    { codigo: 'SMA0301', nome: 'Cálculo I' },
+    { codigo: 'SMA0354', nome: 'Cálculo II' },
+    { codigo: 'SMA0355', nome: 'Cálculo III' },
+    { codigo: 'SMA0356', nome: 'Cálculo IV' },
+    { codigo: 'SMA0300', nome: 'Geometria Analítica' },
+    { codigo: 'SMA0305', nome: 'Álgebra Linear' },
+    { codigo: 'SME0340', nome: 'Cálculo Numérico' },
+    { codigo: 'SME0300', nome: 'Estatística e Probabilidade' },
+    { codigo: '7600005', nome: 'Física I' },
+    { codigo: '7600006', nome: 'Física II' },
+    { codigo: '7600007', nome: 'Física III' },
+    { codigo: '7600008', nome: 'Física IV' },
+    { codigo: 'SQM0400', nome: 'Química Geral' },
+    { codigo: 'SET0188', nome: 'Resistência dos Materiais I' },
+    { codigo: 'SET0198', nome: 'Resistência dos Materiais II' },
+    { codigo: 'SET0403', nome: 'Mecânica das Estruturas I' },
+    { codigo: 'SEM0500', nome: 'Mecânica Geral I' },
+    { codigo: 'SEM0501', nome: 'Mecanismos' },
+    { codigo: 'SEM0538', nome: 'Mecânica dos Sólidos' },
+    { codigo: 'SEM0533', nome: 'Termodinâmica Aplicada' },
+    { codigo: 'SHS0360', nome: 'Mecânica dos Fluidos' },
+    { codigo: 'SEL0353', nome: 'Circuitos Elétricos I' },
+    { codigo: 'SEL0414', nome: 'Eletromagnetismo' },
+    { codigo: 'SEP0142', nome: 'Introdução à Engenharia de Produção' },
+    { codigo: 'SMM0193', nome: 'Ciência dos Materiais' },
+    { codigo: 'SAA0100', nome: 'Introdução à Engenharia Aeronáutica' },
+    { codigo: 'STT0410', nome: 'Engenharia de Transportes' },
+    { codigo: 'SSC0108', nome: 'Introdução à Ciência da Computação' }
+  ];
 
   function normalizarNomeDocente(nomeRaw) {
     if (!nomeRaw) return '';
@@ -1380,16 +1417,60 @@
     if (discCodigo) reg.disciplinas.add(discCodigo);
   }
 
+  function indexarDisciplina(codigoRaw, nomeRaw) {
+    if (!codigoRaw) return;
+    const codLimpo = String(codigoRaw).trim().toUpperCase();
+    const nomeLimpo = String(nomeRaw || '').replace(/\s+/g, ' ').trim();
+    if (!codLimpo) return;
+
+    if (!mapaDisciplinasIndexadas.has(codLimpo)) {
+      mapaDisciplinasIndexadas.set(codLimpo, {
+        codigo: codLimpo,
+        nome: nomeLimpo || codLimpo,
+        nomeNorm: normalizarTexto(nomeLimpo || codLimpo),
+        codNorm: normalizarTexto(codLimpo)
+      });
+    } else if (nomeLimpo && (!mapaDisciplinasIndexadas.get(codLimpo).nome || mapaDisciplinasIndexadas.get(codLimpo).nome === codLimpo)) {
+      const reg = mapaDisciplinasIndexadas.get(codLimpo);
+      reg.nome = nomeLimpo;
+      reg.nomeNorm = normalizarTexto(nomeLimpo);
+    }
+  }
+
   function inicializarIndiceDocentes() {
-    // 1. Carrega semente inicial
     DOCENTES_SEMENTE.forEach(d => {
       indexarDocente(d.nome, d.depto, null);
     });
 
-    // 2. Extrai de itens já em cache (Jupiterweb e Janus)
     if (estadoApp.cacheJupiter) {
       Object.keys(estadoApp.cacheJupiter).forEach(cod => {
         indexarDocentesDeDadosDisciplina(cod, estadoApp.cacheJupiter[cod]);
+      });
+    }
+  }
+
+  function inicializarIndiceDisciplinas() {
+    DISCIPLINAS_SEMENTE.forEach(d => {
+      indexarDisciplina(d.codigo, d.nome);
+    });
+
+    if (estadoApp.cacheJupiter) {
+      Object.keys(estadoApp.cacheJupiter).forEach(cod => {
+        const item = estadoApp.cacheJupiter[cod];
+        if (item && item.nome) {
+          indexarDisciplina(cod, item.nome);
+        }
+      });
+    }
+
+    if (estadoApp.dadosBrutos && Array.isArray(estadoApp.dadosBrutos.grade)) {
+      estadoApp.dadosBrutos.grade.forEach(linha => {
+        if (!Array.isArray(linha)) return;
+        linha.forEach(cel => {
+          if (cel && cel.d && Array.isArray(cel.d)) {
+            cel.d.forEach(c => indexarDisciplina(c, null));
+          }
+        });
       });
     }
   }
@@ -1420,6 +1501,7 @@
         termo: '',
         ehVazio: true,
         departamentos: CATALOGO_DEPARTAMENTOS.slice(0, 6),
+        disciplinas: [],
         docentes: [],
         acoesRapidas: [
           { rotulo: '🚪 Salas Livres', acao: 'livres' },
@@ -1460,7 +1542,40 @@
 
     deptosEncontrados.sort((a, b) => b.pontuacao - a.pontuacao);
 
-    // 2. Docentes
+    // 2. Disciplinas (quando termo tem pelo menos 2 caracteres, ou match em código)
+    const disciplinasEncontradas = [];
+    if (termoStr.length >= 2) {
+      mapaDisciplinasIndexadas.forEach(disc => {
+        let pontuacao = 0;
+        const partesNome = disc.nomeNorm.split(/\s+/);
+
+        if (disc.codNorm === tNorm) {
+          pontuacao = 100;
+        } else if (disc.codNorm.startsWith(tNorm)) {
+          pontuacao = 85;
+        } else if (disc.nomeNorm.startsWith(tNorm)) {
+          pontuacao = 75;
+        } else if (partesNome.some(p => p.startsWith(tNorm))) {
+          pontuacao = 65;
+        } else if (disc.codNorm.includes(tNorm)) {
+          pontuacao = 55;
+        } else if (disc.nomeNorm.includes(tNorm)) {
+          pontuacao = 45;
+        }
+
+        if (pontuacao > 0) {
+          disciplinasEncontradas.push({
+            codigo: disc.codigo,
+            nome: disc.nome,
+            pontuacao: pontuacao
+          });
+        }
+      });
+
+      disciplinasEncontradas.sort((a, b) => b.pontuacao - a.pontuacao);
+    }
+
+    // 3. Docentes
     const docentesEncontrados = [];
     mapaDocentesIndexados.forEach(doc => {
       let pontuacao = 0;
@@ -1489,6 +1604,7 @@
       termo: termoStr,
       ehVazio: false,
       departamentos: deptosEncontrados.slice(0, 6),
+      disciplinas: disciplinasEncontradas.slice(0, 5),
       docentes: docentesEncontrados.slice(0, 6),
       acoesRapidas: []
     };
@@ -1500,10 +1616,11 @@
 
     const res = buscarSugestoes(termo);
     const temDeptos = res.departamentos.length > 0;
+    const temDisciplinas = res.disciplinas && res.disciplinas.length > 0;
     const temDocs = res.docentes.length > 0;
     const temAcoes = (res.acoesRapidas && res.acoesRapidas.length > 0);
 
-    if (!temDeptos && !temDocs && !temAcoes) {
+    if (!temDeptos && !temDisciplinas && !temDocs && !temAcoes) {
       fecharSugestoesBusca();
       return;
     }
@@ -1541,6 +1658,25 @@
                 <span class="chip-sugestao-sigla">${d.sigla}</span>
                 <span class="chip-sugestao-rotulo">${escapeHtml(d.apelido)}</span>
                 <span class="chip-sugestao-tag">${d.unidade}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    if (temDisciplinas) {
+      html += `
+        <div class="sugestoes-secao">
+          <div class="sugestoes-secao-header">
+            <span class="sugestoes-secao-titulo"><span>📚</span> Disciplinas</span>
+            <span class="sugestoes-secao-count">${res.disciplinas.length}</span>
+          </div>
+          <div class="sugestoes-chips-grid">
+            ${res.disciplinas.map(disc => `
+              <button type="button" class="chip-sugestao chip-disciplina" data-valor="${disc.codigo}" data-tipo="disciplina" title="Filtrar por ${escapeHtml(disc.codigo)} — ${escapeHtml(disc.nome)}">
+                <span class="chip-sugestao-sigla">${disc.codigo}</span>
+                <span class="chip-sugestao-rotulo">${escapeHtml(disc.nome)}</span>
               </button>
             `).join('')}
           </div>
@@ -1622,6 +1758,7 @@
 
   function configurarAutocompleteBusca() {
     inicializarIndiceDocentes();
+    inicializarIndiceDisciplinas();
 
     const inpBusca = document.getElementById('input-busca-sala');
     const popover = document.getElementById('busca-sugestoes-dropdown');
@@ -2487,11 +2624,21 @@
     // Atualiza links visíveis no DOM
     atualizarEnriquecimentoCelulasVisiveis(lote);
 
-    // Indexa dinamicamente quaisquer novos docentes recebidos no lote
-    if (dadosRecebidos && typeof indexarDocentesDeDadosDisciplina === 'function') {
-      Object.keys(dadosRecebidos).forEach(cod => {
-        indexarDocentesDeDadosDisciplina(cod, dadosRecebidos[cod]);
-      });
+    // Indexa dinamicamente quaisquer novos docentes e disciplinas recebidos no lote
+    if (dadosRecebidos) {
+      if (typeof indexarDocentesDeDadosDisciplina === 'function') {
+        Object.keys(dadosRecebidos).forEach(cod => {
+          indexarDocentesDeDadosDisciplina(cod, dadosRecebidos[cod]);
+        });
+      }
+      if (typeof indexarDisciplina === 'function') {
+        Object.keys(dadosRecebidos).forEach(cod => {
+          const item = dadosRecebidos[cod];
+          if (item && item.nome) {
+            indexarDisciplina(cod, item.nome);
+          }
+        });
+      }
       const inpBusca = document.getElementById('input-busca-sala');
       if (inpBusca && document.activeElement === inpBusca && typeof atualizarSugestoesBusca === 'function') {
         atualizarSugestoesBusca(inpBusca.value);

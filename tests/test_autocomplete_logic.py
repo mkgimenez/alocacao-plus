@@ -136,15 +136,71 @@ DOCENTES_SEMENTE = [
 ]
 
 
+DISCIPLINAS_SEMENTE = [
+    {"codigo": "SMA0301", "nome": "Cálculo I"},
+    {"codigo": "SMA0354", "nome": "Cálculo II"},
+    {"codigo": "SMA0355", "nome": "Cálculo III"},
+    {"codigo": "SMA0356", "nome": "Cálculo IV"},
+    {"codigo": "SMA0300", "nome": "Geometria Analítica"},
+    {"codigo": "SMA0305", "nome": "Álgebra Linear"},
+    {"codigo": "SME0340", "nome": "Cálculo Numérico"},
+    {"codigo": "SME0300", "nome": "Estatística e Probabilidade"},
+    {"codigo": "7600005", "nome": "Física I"},
+    {"codigo": "7600006", "nome": "Física II"},
+    {"codigo": "7600007", "nome": "Física III"},
+    {"codigo": "7600008", "nome": "Física IV"},
+    {"codigo": "SQM0400", "nome": "Química Geral"},
+    {"codigo": "SET0188", "nome": "Resistência dos Materiais I"},
+    {"codigo": "SET0198", "nome": "Resistência dos Materiais II"},
+    {"codigo": "SET0403", "nome": "Mecânica das Estruturas I"},
+    {"codigo": "SEM0500", "nome": "Mecânica Geral I"},
+    {"codigo": "SEM0501", "nome": "Mecanismos"},
+    {"codigo": "SEM0538", "nome": "Mecânica dos Sólidos"},
+    {"codigo": "SEM0533", "nome": "Termodinâmica Aplicada"},
+    {"codigo": "SHS0360", "nome": "Mecânica dos Fluidos"},
+    {"codigo": "SEL0353", "nome": "Circuitos Elétricos I"},
+    {"codigo": "SEL0414", "nome": "Eletromagnetismo"},
+    {"codigo": "SEP0142", "nome": "Introdução à Engenharia de Produção"},
+    {"codigo": "SMM0193", "nome": "Ciência dos Materiais"},
+    {"codigo": "SAA0100", "nome": "Introdução à Engenharia Aeronáutica"},
+    {"codigo": "STT0410", "nome": "Engenharia de Transportes"},
+    {"codigo": "SSC0108", "nome": "Introdução à Ciência da Computação"}
+]
+
+
 class AutocompleteEngine:
     """Motor de busca e autocomplete em memória espelhando src/scripts.html."""
 
-    def __init__(self, catalogo=None, docentes_semente=None):
+    def __init__(self, catalogo=None, docentes_semente=None, disciplinas_semente=None):
         self.catalogo = catalogo or CATALOGO_DEPARTAMENTOS
         self.mapa_docentes = {}
+        self.mapa_disciplinas = {}
 
         for d in (docentes_semente or DOCENTES_SEMENTE):
             self.indexar_docente(d["nome"], d.get("depto", ""), None)
+
+        for disc in (disciplinas_semente or DISCIPLINAS_SEMENTE):
+            self.indexar_disciplina(disc["codigo"], disc["nome"])
+
+    def indexar_disciplina(self, codigo_raw, nome_raw):
+        if not codigo_raw:
+            return
+        cod_limpo = str(codigo_raw).strip().upper()
+        nome_limpo = re.sub(r'\s+', ' ', str(nome_raw or "")).strip()
+        if not cod_limpo:
+            return
+
+        if cod_limpo not in self.mapa_disciplinas:
+            self.mapa_disciplinas[cod_limpo] = {
+                "codigo": cod_limpo,
+                "nome": nome_limpo or cod_limpo,
+                "nomeNorm": normalizar_texto(nome_limpo or cod_limpo),
+                "codNorm": normalizar_texto(cod_limpo)
+            }
+        elif nome_limpo and (not self.mapa_disciplinas[cod_limpo]["nome"] or self.mapa_disciplinas[cod_limpo]["nome"] == cod_limpo):
+            reg = self.mapa_disciplinas[cod_limpo]
+            reg["nome"] = nome_limpo
+            reg["nomeNorm"] = normalizar_texto(nome_limpo)
 
     def indexar_docente(self, nome_raw, depto="", disc_codigo=None):
         nome_limpo = normalizar_nome_docente(nome_raw)
@@ -169,7 +225,11 @@ class AutocompleteEngine:
             reg["disciplinas"].add(disc_codigo)
 
     def indexar_de_dados_disciplina(self, codigo, dados):
-        if not dados or "turmas" not in dados:
+        if not dados:
+            return
+        if dados.get("nome"):
+            self.indexar_disciplina(codigo, dados["nome"])
+        if "turmas" not in dados:
             return
         depto = codigo[:3].upper() if re.match(r'^[A-Za-z]{3}', str(codigo)) else ""
         for t in dados["turmas"].values():
@@ -188,6 +248,7 @@ class AutocompleteEngine:
                 "termo": "",
                 "ehVazio": True,
                 "departamentos": self.catalogo[:6],
+                "disciplinas": [],
                 "docentes": [],
                 "acoesRapidas": [
                     {"rotulo": "🚪 Salas Livres", "acao": "livres"},
@@ -224,7 +285,36 @@ class AutocompleteEngine:
 
         deptos_encontrados.sort(key=lambda x: x["pontuacao"], reverse=True)
 
-        # 2. Docentes
+        # 2. Disciplinas (quando termo tem >= 2 caracteres)
+        disciplinas_encontradas = []
+        if len(termo_str) >= 2:
+            for disc in self.mapa_disciplinas.values():
+                pontuacao = 0
+                partes_nome = disc["nomeNorm"].split()
+
+                if disc["codNorm"] == t_norm:
+                    pontuacao = 100
+                elif disc["codNorm"].startswith(t_norm):
+                    pontuacao = 85
+                elif disc["nomeNorm"].startswith(t_norm):
+                    pontuacao = 75
+                elif any(p.startswith(t_norm) for p in partes_nome):
+                    pontuacao = 65
+                elif t_norm in disc["codNorm"]:
+                    pontuacao = 55
+                elif t_norm in disc["nomeNorm"]:
+                    pontuacao = 45
+
+                if pontuacao > 0:
+                    disciplinas_encontradas.append({
+                        "codigo": disc["codigo"],
+                        "nome": disc["nome"],
+                        "pontuacao": pontuacao
+                    })
+
+            disciplinas_encontradas.sort(key=lambda x: x["pontuacao"], reverse=True)
+
+        # 3. Docentes
         docentes_encontrados = []
         for doc in self.mapa_docentes.values():
             pontuacao = 0
@@ -250,6 +340,7 @@ class AutocompleteEngine:
             "termo": termo_str,
             "ehVazio": False,
             "departamentos": deptos_encontrados[:6],
+            "disciplinas": disciplinas_encontradas[:5],
             "docentes": docentes_encontrados[:6],
             "acoesRapidas": []
         }
@@ -361,12 +452,46 @@ class TestAutocompleteLogic(unittest.TestCase):
         nomes_sem = [d["nome"] for d in res_sem_acento["docentes"]]
         self.assertEqual(nomes_com, nomes_sem)
 
+    def test_busca_disciplina_por_nome(self):
+        """Valida que digitar 'calculo' sugere Cálculo I, II, III, IV."""
+        res = self.engine.buscar_sugestoes("calculo")
+        self.assertTrue(len(res["disciplinas"]) > 0)
+        nomes = [d["nome"] for d in res["disciplinas"]]
+        self.assertTrue(any("Cálculo" in n for n in nomes))
+
+    def test_busca_disciplina_por_codigo(self):
+        """Valida que digitar código exato (ex: 'sma0356') encontra a disciplina com pontuação 100."""
+        res = self.engine.buscar_sugestoes("sma0356")
+        self.assertTrue(len(res["disciplinas"]) > 0)
+        primeira = res["disciplinas"][0]
+        self.assertEqual(primeira["codigo"], "SMA0356")
+        self.assertEqual(primeira["pontuacao"], 100)
+        self.assertEqual(primeira["nome"], "Cálculo IV")
+
+    def test_busca_disciplina_por_palavra_composta(self):
+        """Valida que digitar palavra interna (ex: 'materiais') encontra Resistência dos Materiais."""
+        res = self.engine.buscar_sugestoes("materiais")
+        nomes = [d["nome"] for d in res["disciplinas"]]
+        self.assertTrue(any("Resistência dos Materiais" in n for n in nomes))
+
+    def test_indexacao_dinamica_novas_disciplinas(self):
+        """Valida que disciplinas recebidas nos lotes em tempo de execução são indexadas e sugeridas."""
+        dados_novos = {
+            "nome": "Computação Quântica Aplicada",
+            "turmas": {}
+        }
+        self.engine.indexar_de_dados_disciplina("SEL0999", dados_novos)
+
+        res = self.engine.buscar_sugestoes("quantica")
+        self.assertTrue(any(d["codigo"] == "SEL0999" and "Quântica" in d["nome"] for d in res["disciplinas"]))
+
     def test_termo_vazio_retorna_atalhos(self):
         """Valida que busca vazia devolve ações rápidas e top 6 departamentos."""
         res = self.engine.buscar_sugestoes("")
         self.assertTrue(res["ehVazio"])
         self.assertEqual(len(res["acoesRapidas"]), 3)
         self.assertEqual(len(res["departamentos"]), 6)
+        self.assertEqual(len(res["disciplinas"]), 0)
         self.assertEqual(len(res["docentes"]), 0)
 
     def test_property_fuzzing_estabilidade(self):
@@ -378,8 +503,10 @@ class TestAutocompleteLogic(unittest.TestCase):
             res = self.engine.buscar_sugestoes(query)
             self.assertIsInstance(res, dict)
             self.assertIn("departamentos", res)
+            self.assertIn("disciplinas", res)
             self.assertIn("docentes", res)
             self.assertLessEqual(len(res["departamentos"]), 6)
+            self.assertLessEqual(len(res["disciplinas"]), 5)
             self.assertLessEqual(len(res["docentes"]), 6)
 
 
