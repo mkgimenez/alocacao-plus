@@ -2,9 +2,6 @@
 
 - [ ] Em alguns testes, o leiaute da web app parece não ter funcionado bem em um iPhone XR com iOS 16. Faça uma verificação e atualização do código para garantir que o leiaute funcione bem em celulares.
 
-- [ ] Atualizar para o Janus
-    Todas as funcionalidades que foram criadas para as células de Graduação, devem ser replicadas para as células das diciplinas de pós-graduação. A diferença aqui é que depois de fazer o parser da página da disciplina do Janus, será necessário buscar uma URL no formato "https://uspdigital.usp.br/janus/publico/turma/<SIGLA DA DISCIPLINA>/<ALGUM DÍGITO>", acessar essa url e fazer um novo parser para, daí sim conseguir os dados da disciplina.
-
 ---
 
 
@@ -73,6 +70,16 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.3.0:** Enriquecimento Progressivo com Dados do Janus (Pós-Graduação):
+  - Replicação completa das funcionalidades da Graduação (Jupiterweb) para a Pós-Graduação (Janus) sem regressões;
+  - Pipeline otimizado em 2 etapas: busca de metadados da disciplina + resolução automática das turmas ativas sem necessidade de chamadas N+1;
+  - Bypass nativo da barreira JSF ViewState com extração direta dos detalhes da turma via endpoint REST e tolerância a charset tipográfico Windows-1252 (`0x96`);
+  - Ancoragem semântica robusta nas classes CSS `.intl_*` (resiliente a labels dinâmicos injetados via DWR no cliente);
+  - Card Modal responsivo e adaptativo com badge dinâmico Pós-Graduação (`badge-nivel-pos`), link externo contextual ("Abrir no Janus" vs "Abrir no Jupiterweb") e badges semânticos de local de aula e slots de horários com quebra automática de linha;
+  - Tooltips de células dinâmicos para pós-graduação ("Sem oferecimento ativo no Janus" vs "Jupiterweb" e nomes de docentes);
+  - Busca multicritério inteligente expandida com suporte a modalidades de pós (`Presencial`, `Remota`, `Híbrida`, `EAD`), local de aula (ex: `"sala de aula"`, `"Meet"`), programa de pós-graduação e regex resiliente de turmas (`SEP5864 - 1` casando com `T1`, `t01`, `turma 1`);
+  - Governança e arquitetura registradas em `docs/especificacao-parser-janus.md` e `docs/adr/0015-enriquecimento-progressivo-janus.md`;
+  - Suíte de testes automatizados expandida para 47 testes (unitários, mocks de rede e fuzzing property-based) com 100% de sucesso.
 - [x] **v1.2.2:** Busca Inteligente Multicritério com Resiliência Estruturada:
   - Filtragem de células por sigla da disciplina, nome oficial (Jupiterweb), turma resiliente (`T01`, `t01`, `T1`, `t1`, `T-01`, `t-1`, `T 01`, `turma 1`), docentes (inclusive múltiplos e co-docência), modalidade (`Teórica`/`Prática`, `tv`/`pv`), período (`Semestral`/`Anual`) e qualquer palavra do campo de observações;
   - Extração explícita de `periodo` no parser do Jupiterweb sem exigir cálculos manuais durante a busca;

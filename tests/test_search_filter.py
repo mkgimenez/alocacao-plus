@@ -68,6 +68,14 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
                     nums.append(n)
             except (ValueError, TypeError):
                 pass
+        if not nums:
+            for m in re.finditer(r'\b[A-Za-z]{3}5\d{3}\s*-\s*(\d{1,2})\b', cel["t"], re.IGNORECASE):
+                try:
+                    n = int(m.group(1))
+                    if n not in nums:
+                        nums.append(n)
+                except (ValueError, TypeError):
+                    pass
 
     tem_turma = len(nums) > 0
     raw_t = cel.get("t", "")
@@ -137,9 +145,12 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
                     continue
             return False
 
-        # 2. Token de Modalidade (direto do card: tipo || 'Teórica')
+        # 2. Token de Modalidade (Teórica/Prática para Graduação, Presencial/Remota/Híbrida para Pós)
         eh_teorica = tok in ("teorica", "teorico", "teoricas", "teoricos", "tv")
         eh_pratica = tok in ("pratica", "pratico", "praticas", "praticos", "pv")
+        eh_presencial = tok in ("presencial", "presenciais")
+        eh_remota = tok in ("remota", "remoto", "remotas", "remotos", "ead", "online")
+        eh_hibrida = tok in ("hibrida", "hibrido", "hibridas", "hibridos")
 
         if eh_teorica:
             if tem_tv:
@@ -151,6 +162,18 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
             if tem_pv:
                 continue
             if any("prat" in normalizar_texto(tj.get("tipo", "Teorica")) or "pr" in normalizar_texto(tj.get("tipo", "Teorica")) for tj in turmas_para_busca):
+                continue
+
+        if eh_presencial:
+            if any("presenc" in normalizar_texto(tj.get("tipo", "")) for tj in turmas_para_busca):
+                continue
+
+        if eh_remota:
+            if any("remot" in normalizar_texto(tj.get("tipo", "")) or "ead" in normalizar_texto(tj.get("tipo", "")) or "online" in normalizar_texto(tj.get("tipo", "")) for tj in turmas_para_busca):
+                continue
+
+        if eh_hibrida:
+            if any("hibrid" in normalizar_texto(tj.get("tipo", "")) for tj in turmas_para_busca):
                 continue
 
         # 3. Token de Período (direto do card: periodo || 'Semestral')
@@ -169,7 +192,7 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
             if turmas_para_busca and any("anual" in normalizar_texto(tj.get("periodo", "Semestral")) for tj in turmas_para_busca):
                 continue
 
-        # 4. Busca Geral: Sigla, Nome, Docentes, Observações e Texto da Célula
+        # 4. Busca Geral: Sigla, Nome, Programa, Docentes, Local, Observações e Texto da Célula
         if tok in t_norm:
             continue
 
@@ -184,6 +207,9 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
             if dados.get("codigo") and tok in normalizar_texto(dados["codigo"]):
                 casou_metadados = True
                 break
+            if dados.get("programa") and tok in normalizar_texto(dados["programa"]):
+                casou_metadados = True
+                break
         if casou_metadados:
             continue
 
@@ -191,6 +217,23 @@ def celula_corresponde_a_busca(cel, tokens, cache_jupiter=None):
             # Docentes
             docs = tj.get("docentes", [])
             if any(tok in normalizar_texto(d) for d in docs):
+                casou_metadados = True
+                break
+
+            # Horários com docentes ou local
+            if tj.get("horarios"):
+                for hor in tj["horarios"]:
+                    if hor.get("docente") and tok in normalizar_texto(hor["docente"]):
+                        casou_metadados = True
+                        break
+                    if hor.get("local") and tok in normalizar_texto(hor["local"]):
+                        casou_metadados = True
+                        break
+                if casou_metadados:
+                    break
+
+            # Local da turma
+            if tj.get("local") and tok in normalizar_texto(tj["local"]):
                 casou_metadados = True
                 break
 
@@ -266,6 +309,56 @@ class TestSearchFilter(unittest.TestCase):
                         "observacoes": "Laboratório de Geotecnia"
                     }
                 }
+            },
+            "SEP5864": {
+                "codigo": "SEP5864",
+                "nome": "Pesquisa Operacional Aplicada",
+                "programa": "Engenharia de Produção",
+                "nivel": "pos",
+                "semOferecimento": False,
+                "turmas": {
+                    "01": {
+                        "numero": "01",
+                        "codigoTurma": "2026101",
+                        "tipo": "Presencial",
+                        "periodo": "Semestral",
+                        "docentes": ["Carlos Dias Maciel"],
+                        "observacoes": "Mestrado e Doutorado",
+                        "horarios": [
+                            {
+                                "dia": "Ter",
+                                "horario": "14:00 às 18:00",
+                                "local": "sala de aula",
+                                "docente": "Carlos Dias Maciel"
+                            }
+                        ]
+                    }
+                }
+            },
+            "SHS5991": {
+                "codigo": "SHS5991",
+                "nome": "Modelagem Hidrológica Avançada",
+                "programa": "Engenharia Hidráulica e Saneamento",
+                "nivel": "pos",
+                "semOferecimento": False,
+                "turmas": {
+                    "01": {
+                        "numero": "01",
+                        "codigoTurma": "2026101",
+                        "tipo": "Remota",
+                        "periodo": "Semestral",
+                        "docentes": ["Eduardo Mario Mendiondo"],
+                        "observacoes": "Aulas síncronas via Google Meet",
+                        "horarios": [
+                            {
+                                "dia": "Qui",
+                                "horario": "08:00 às 12:00",
+                                "local": "online Meet",
+                                "docente": "Eduardo Mario Mendiondo"
+                            }
+                        ]
+                    }
+                }
             }
         }
 
@@ -309,6 +402,22 @@ class TestSearchFilter(unittest.TestCase):
             "t": "SMA0356",
             "d": ["SMA0356"],
             "turmas": []
+        }
+
+        # Célula Pós-Graduação (Janus) Presencial
+        self.cel_pos_presencial = {
+            "t": "SEP5864 - 1",
+            "d": ["SEP5864"],
+            "turmas": ["01"],
+            "pos": True
+        }
+
+        # Célula Pós-Graduação (Janus) Remota
+        self.cel_pos_remota = {
+            "t": "SHS5991 - 1",
+            "d": ["SHS5991"],
+            "turmas": ["01"],
+            "pos": True
         }
 
     def test_criterio_1_sigla_disciplina(self):
@@ -446,6 +555,50 @@ class TestSearchFilter(unittest.TestCase):
         self.assertTrue(celula_corresponde_a_busca(self.cel_sem_turma, tok_t2, self.cache))
         self.assertFalse(celula_corresponde_a_busca(self.cel_sem_turma, tok_t3, self.cache))
 
+    def test_criterio_pos_graduacao_modalidade_presencial_e_remota(self):
+        """Valida que tokens de modalidade de pós (Presencial, Remota, EAD, etc.) casam com células do Janus."""
+        # SEP5864 é Presencial
+        for q in ["Presencial", "presencial", "presenciais"]:
+            tokens = extrair_tokens_busca(normalizar_texto(q))
+            self.assertTrue(celula_corresponde_a_busca(self.cel_pos_presencial, tokens, self.cache), f"Falhou presencial '{q}'")
+            self.assertFalse(celula_corresponde_a_busca(self.cel_pos_remota, tokens, self.cache), f"Remota não deve casar com '{q}'")
+
+        # SHS5991 é Remota
+        for q in ["Remota", "remoto", "ead", "online"]:
+            tokens = extrair_tokens_busca(normalizar_texto(q))
+            self.assertTrue(celula_corresponde_a_busca(self.cel_pos_remota, tokens, self.cache), f"Falhou remota '{q}'")
+            self.assertFalse(celula_corresponde_a_busca(self.cel_pos_presencial, tokens, self.cache), f"Presencial não deve casar com '{q}'")
+
+    def test_criterio_pos_graduacao_local_de_aula(self):
+        """Valida que buscar pelo local (sala de aula, Meet) encontra a célula de pós correspondente."""
+        # SEP5864 horário tem local "sala de aula"
+        tok_sala = extrair_tokens_busca(normalizar_texto("sala de aula"))
+        self.assertTrue(celula_corresponde_a_busca(self.cel_pos_presencial, tok_sala, self.cache))
+
+        # SHS5991 horário tem local "online Meet"
+        tok_meet = extrair_tokens_busca(normalizar_texto("Meet"))
+        self.assertTrue(celula_corresponde_a_busca(self.cel_pos_remota, tok_meet, self.cache))
+        self.assertFalse(celula_corresponde_a_busca(self.cel_pos_presencial, tok_meet, self.cache))
+
+    def test_criterio_pos_graduacao_programa(self):
+        """Valida busca pelo nome do Programa de Pós-Graduação (Engenharia de Produção, Hidráulica)."""
+        tok_prod = extrair_tokens_busca(normalizar_texto("Produção"))
+        self.assertTrue(celula_corresponde_a_busca(self.cel_pos_presencial, tok_prod, self.cache))
+
+        tok_hidr = extrair_tokens_busca(normalizar_texto("Hidráulica"))
+        self.assertTrue(celula_corresponde_a_busca(self.cel_pos_remota, tok_hidr, self.cache))
+        self.assertFalse(celula_corresponde_a_busca(self.cel_pos_presencial, tok_hidr, self.cache))
+
+    def test_criterio_pos_graduacao_turma_resiliente(self):
+        """Valida casamento de turma em células de pós (SEP5864 - 1 casando com T1, t01, turma 1)."""
+        for q in ["T1", "t01", "turma 1", "T-1"]:
+            tokens = extrair_tokens_busca(normalizar_texto(q))
+            self.assertTrue(celula_corresponde_a_busca(self.cel_pos_presencial, tokens, self.cache), f"Falhou turma pós '{q}'")
+
+        # Turma inexistente (T2)
+        tok_t2 = extrair_tokens_busca(normalizar_texto("T2"))
+        self.assertFalse(celula_corresponde_a_busca(self.cel_pos_presencial, tok_t2, self.cache))
+
     def test_fuzzing_estabilidade(self):
         """Property-based Fuzzing com 500 buscas aleatórias garantindo 0 crashes/exceções."""
         for _ in range(500):
@@ -455,6 +608,8 @@ class TestSearchFilter(unittest.TestCase):
             # Garante que roda e retorna booleano sem levantar nenhuma exceção
             res = celula_corresponde_a_busca(self.cel_t1, tokens, self.cache)
             self.assertIsInstance(res, bool)
+            res_pos = celula_corresponde_a_busca(self.cel_pos_presencial, tokens, self.cache)
+            self.assertIsInstance(res_pos, bool)
 
 
 if __name__ == "__main__":

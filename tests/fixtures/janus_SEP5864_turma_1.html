@@ -1,0 +1,491 @@
+
+<!DOCTYPE html PUBLIC>
+
+
+<html>
+
+
+
+
+
+
+
+
+
+
+
+<head>
+	
+
+
+	<title>Janus</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=9; IE=8; IE=7; IE=EDGE" />
+	<meta http-equiv="Content-Type" content="text/html; charset=ISO8859-1">
+ 	
+
+
+
+	<link rel="shortcut icon" type="image/x-icon" href="/janus/imagens/iconeJanus.ico?version=3220260916213539"/>
+	
+	 
+	<script src="https://uspdigital.usp.br/comumwebdev/libs/jquery/1.12.4/jquery.min.js?version=20260916213539"></script>
+	
+
+	<link rel="stylesheet" href="/janus/css/jqueryui/1.11.4/themes/smothness/jquery-ui.css">
+	
+	<script src="https://uspdigital.usp.br/comumwebdev/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+ 
+
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery-liveandletdie.js?version=3220260916213539"></script>	
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.cookie.js"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.exists.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery-select-first-option.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.forms.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.loading.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="https://uspdigital.usp.br/comumwebdev/libs/jquery/plugins/URI/1.18.1/URI.min.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.jqEasyCharCounter.min.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.onlyNumbers.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery-jsf-form.js"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.corretorOrtografico.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.buscarPessoa.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.alunoSelecionado.js?version=3220260916213539"></script>
+	
+	<script type="text/javascript" src="https://uspdigital.usp.br/comumwebdev/libs/jquery/plugins/simplemodal/1.4.4/jquery.simplemodal.min.js"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jquery.wait.js?version=3220260916213539"></script>
+	
+	<!-- validation -->
+	
+	<script type="text/javascript" src="https://uspdigital.usp.br/comumwebdev/libs/jquery/plugins/validationEngine/2.6.4/jquery.validationEngine.js"></script>
+	<script type="text/javascript" src="https://uspdigital.usp.br/comumwebdev/libs/jquery/plugins/validationEngine/2.6.4/jquery.validationEngine-pt_BR.js" charset="utf-8"></script>
+	
+	<link href="https://uspdigital.usp.br/comumwebdev/libs/jquery/plugins/validationEngine/2.6.4/jquery.validationEngine.css" rel="stylesheet" type="text/css"/>
+	<!-- validation -->
+	
+	<!-- script type="text/javascript" src="/janus/javascript/jquery/jquery.balloon.min.js?version=3220260916213539"></script-->
+	
+	
+	<!-- JQGRID -->
+	<script type="text/javascript" src="/janus/javascript/jquery/jqgrid/jquery.jqGrid-locale.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/jqgrid/jquery.jqGrid.min.js?version=3220260916213539"></script>
+	<link href="/janus/css/jquery/ui.jqgrid.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<!-- JQGRID -->
+	
+	<!-- BEGIN COMUM COMPONENTES-->
+	
+	<script type="text/javascript" src="https://uspdigital.usp.br/comumwebdev/libs/usp/util/1.0/script.js"></script>
+	<!-- END COMUM COMPONENTES-->
+	
+	<script type="text/javascript" src="/janus/javascript/funcoes.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/janus.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/js-tests.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/menu.js?version=3220260916213539"></script>
+	<!-- <script type="text/javascript" src="/janus/javascript/buscarAluno.js?version=3220260916213539"></script> -->
+	<script type="text/javascript" src="/janus/javascript/css_browser_selector.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/browser.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/json2.js?version=3220260916213539"></script>
+	
+	<script type="text/javascript" src="/janus/javascript/jquery/cleeditor/jquery_cleditor.js?version=3220260916213539"></script>
+	<script type="text/javascript" src="/janus/javascript/jquery/cleeditor/jquery_cleditor_min.js?version=3220260916213539"></script>
+ 
+	<!-- TAGS -->
+	<script type='text/javascript' src='/janus/javascript/jquery/jquery.tags.js?version=3220260916213539'></script>
+	<link href="/janus/css/jquery/jquery.tags.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<!-- TAGS -->
+
+	<script type="text/javascript" src="/janus/javascript/usp-servico.js?version=3220260916213539"></script>
+	
+	<!-- portal de servi&#231;os -->
+	<script src="//uspdigital.usp.br/comumwebdev/libs/messages/1.3.2/messages.min.js"></script>
+	
+		
+	<!-- INICIO DWR -->
+	<script type='text/javascript' src='/janus/dwr/engine.js?version=3220260916213539'></script>	
+	<script type='text/javascript' src='/janus/dwr/util.js?version=3220260916213539'></script>	
+	<script type='text/javascript' src='/janus/dwr/interface/Aluno.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Area.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Bolsista.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/ProgramaUnificadoDeBolsasAjax.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/ConvenioArea.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Excecao.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Questionario.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/PAE.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Egressos.js?version=3220260916213539'></script>	
+	<script type='text/javascript' src='/janus/dwr/interface/Permissao.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Perfil.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Recadastro.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Usuario.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Util.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/TabelasAuxiliares.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/AtributoPos.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Disciplina.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/CorretorOrtografico.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/MembroDaBancaDefesa.js?version=3220260916213539'></script>
+	<script type='text/javascript' src='/janus/dwr/interface/Matricula.js?version=3220260916213539'></script>	
+	<script type='text/javascript' src='/janus/dwr/interface/Docente.js?version=3220260916213539'></script>
+	
+	
+	<script type="text/javascript" src="/janus/javascript/dwr-usp-extension.js?version=3220260916213539"></script>
+	
+	
+	<!-- FIM DWR -->
+	<link href="/janus/css/principal.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<link href="/janus/css/menu.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	
+	<link href="/janus/css/jquery/jquery.loading.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<link href="/janus/css/jquery/jquery-ui/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" type="text/css"/>
+	
+	<link href="/janus/css/jquery/jquery.buscarPessoa.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<link href="/janus/css/jquery/jquery.simplemodal.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	<link href="/janus/css/jquery/jquery.alunoSelecionado.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+	
+	<link href="/janus/css/jquery/cleeditor/jquery_cleditor.css?version=3220260916213539" rel="stylesheet" type="text/css"/>
+
+
+
+	<!-- INICIO  DATATABLES -->
+	<!--  new version -->
+		
+		    <link href="/janus/css/jquery/datatables/jquery-datatables-1.10.12.css?version=3220260916213539" rel="stylesheet" type="text/css"/> 
+	  <script type='text/javascript' src='/janus/javascript/jquery/datatables/jquery-datatables-1.10.12.js?version=3220260916213539'></script>
+	    	    <link href="/janus/css/jquery/datatables/jquery.dataTables.custom.css?version=3220260916213539" rel="stylesheet" type="text/css"/> 
+	  <script type='text/javascript' src='/janus/javascript/jquery/datatables/jquery.datatables.sorting.js?version=3220260916213539'></script>
+ 
+	<!-- FIM DATATABLES -->
+	
+	
+	
+ 	
+	  <STYLE>
+	  	#simplemodal-container a.modalCloseImg {
+	  		background:url(/janus/imagens/x.png) no-repeat; /* adjust url as required */
+	  	}
+	  </STYLE>
+      <script language="JavaScript">
+      janus.contextPath  = "/janus";
+      
+      $(document).ready(
+	      	function()
+	      	{	
+	  			 
+	      		//portal de servi&#231;os
+		      	if (window.self !== window.top){
+		      		//estamos em um iframe, possivelmente no portal de servi&#231;os, vamos remover cabe&#231;alho e menu
+		      		$('.areaMenu').hide();
+		      		$('.areaCabecalho').hide();
+		      		$('.perfilPortalServicosForm').show();
+		      		console.log('Estamos em um IFrame, vamos esconder cabecalho e menu')
+		      	}
+	      	}
+       );    
+      
+      </script>
+     
+  	
+      
+</head>
+
+   
+<body id="corpo">
+
+	
+	<script>
+	function alterarPerfilportalServicos(nivel) {
+		$("#perfilPortalServicosForm\\:cmdAlterarPerfilPortalServicos").click();
+	}
+	</script>
+	<table border="0"><tbody></tbody></table>
+	
+
+
+	
+	<table id="janus-container-principal" border="0" cellpadding="0px" cellspacing="0px" width="990px"><tbody><tr><td><div class=" areaCabecalho">
+	<style type="text/css">
+	
+	a.linkCabecalho:hover{
+		background-color: #FFFFFF;
+	}
+	.colunaUm {
+		width: 150px;
+	}
+	.colunaDois {
+		width: 150px;
+	}
+	.colunaTres {
+		width: 200px;
+	}
+	.center {
+		text-align: center;
+	}
+	
+	</style>
+	<table width="100%" height="60" border="0" cellpadding="0" cellspacing="0">
+		<tr>
+			<td width="180" rowspan="3" align="center">
+				<a href="http://www.usp.br" target="_blank" class="linkCabecalho"><img src="https://uspdigital.usp.br/comumwebdev/imagens/cabecalho/usp-logo.png" width="122" height="49" alt="" border="0" style="position: relative; top: -3px;" /></a>
+			</td>
+			<td>
+				<a href="http://www.usp.br" target="_blank" class="linkCabecalho"><img src="https://uspdigital.usp.br/comumwebdev/imagens/cabecalho/usp-logo-texto.png" alt="" width="260" height="44" border="0" style="position: relative; top: 5px;" /></a>
+			</td>
+		</tr>
+	</table>
+	<div style="width: 100%; height: 14px; background-image: url('https://uspdigital.usp.br/comumwebdev/imagens/cabecalho/bg-headtop.gif'); margin-bottom: 5px; text-align: right; color: white; padding-top: 12px; padding-right: 3px; font-family: Verdana; font-size: 10px;">	
+	</div>
+</div>
+
+</div></td></tr>
+<tr><td><table border="0"><tbody><tr><td class="areaMenu"><span class="menuLinks"><div class=""><div id="login">
+				<H3  class="topico headMenu" >Login</H3>
+		 <div style="width:50px;">
+		<div class="subMenu" id="submnuLoginUnico">
+			<ul>
+				<li ><a id="cmdLoginUnico" href="#"> Entrar</a></li>
+			</ul>
+		</div>
+	</div></div><form id="menuForm" name="menuForm" method="post" action="/janus/componente/disciplinasOferecidasInicial.jsf;jsessionid=DF60BEF6DFFA598F4A232E4145DBFCB2" enctype="application/x-www-form-urlencoded"><div>
+					<div id="apresentacao">
+						<H3 class="topico headMenu">Apresenta&#231;&#227;o</H3>
+						<UL class="menu" >
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/comum/apresentacao.jsf">Apresenta&#231;&#227;o</a>
+							</LI>
+						</UL>
+					</div>
+					
+					<div id="acesso">
+						<H3 class="topico headMenu">Acesso</H3>
+						<UL class="menu" >
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/login/esqueciSenha.jsf">Esqueci a senha</a>
+							</LI>
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/login/primeiroAcesso.jsf">Primeiro acesso</a>
+							</LI>
+						</UL>
+					</div>
+					
+					<div id="pos-componente">
+						<H3 class="topico headMenu">Acesso p&#250;blico</H3>
+						<UL class="menu" >
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/componente/periodoMatricula.jsf">Per&#237;odo de matr&#237;cula</a>
+							</LI>
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/componente/disciplinasOferecidasInicial.jsf">Disciplinas oferecidas</a>
+							</LI>
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/componente/disciplinasOferecidasInglesInicial.jsf">Disciplines in English</a>
+							</LI>
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/componente/catalogoDisciplinasInicial.jsf">Cat&#225;logo de disciplinas</a>
+							</LI>
+							<LI> 
+								<a class="dynamicLink" href="__janus.contextPath__/componente/orientadoresInicial.jsf">Orientadores</a>
+							</LI>
+						</UL>
+					</div>
+					 
+				</div>
+			<HR>
+			<UL class="menu" >
+				<LI> 
+					<a href="http://www.alumni.usp.br/">Portal Alumni</a>
+				</LI> 
+			</UL>
+		<input type="hidden" name="menuForm_SUBMIT" value="1" />
+<input type="hidden" name="autoScroll" />
+<input type="hidden" name="jsf_tree_64" id="jsf_tree_64" value="rO0ABXNyAEdvcmcuYXBhY2hlLm15ZmFjZXMuYXBwbGljYXRpb24uVHJlZVN0cnVjdHVyZU1hbmFnZXIkVHJlZVN0cnVjdENvbXBvbmVudEZZF9icSvbPAgAEWwAJX2NoaWxkcmVudABKW0xvcmcvYXBhY2hlL215ZmFjZXMvYXBwbGljYXRpb24vVHJlZVN0cnVjdHVyZU1hbmFnZXIkVHJlZVN0cnVjdENvbXBvbmVudDtMAA9fY29tcG9uZW50Q2xhc3N0ABJMamF2YS9sYW5nL1N0cmluZztMAAxfY29tcG9uZW50SWRxAH4AAlsAB19mYWNldHN0ABNbTGphdmEvbGFuZy9PYmplY3Q7eHB1cgBKW0xvcmcuYXBhY2hlLm15ZmFjZXMuYXBwbGljYXRpb24uVHJlZVN0cnVjdHVyZU1hbmFnZXIkVHJlZVN0cnVjdENvbXBvbmVudDu6rCfIEYWQqgIAAHhwAAAABHNxAH4AAHB0AC9vcmcuYXBhY2hlLm15ZmFjZXMuY3VzdG9tLmRvY3VtZW50LkRvY3VtZW50SGVhZHQAB19pZEpzcDBwc3EAfgAAdXEAfgAFAAAAAXNxAH4AAHVxAH4ABQAAAAFzcQB+AAB1cQB+AAUAAAABc3EAfgAAdXEAfgAFAAAABXNxAH4AAHB0AClqYXZheC5mYWNlcy5jb21wb25lbnQuaHRtbC5IdG1sT3V0cHV0VGV4dHQACWxibFBlcmZpbHBzcQB+AAB1cQB+AAUAAAABc3EAfgAAcHQAI2phdmF4LmZhY2VzLmNvbXBvbmVudC5VSVNlbGVjdEl0ZW1zdAAHX2lkSnNwNHB0ACxqYXZheC5mYWNlcy5jb21wb25lbnQuaHRtbC5IdG1sU2VsZWN0T25lTWVudXQAG2FsdGVyYXJQZXJmaWxwb3J0YWxTZXJ2aWNvc3BzcQB+AABwdAAsamF2YXguZmFjZXMuY29tcG9uZW50Lmh0bWwuSHRtbENvbW1hbmRCdXR0b250AB5jbWRBbHRlcmFyUGVyZmlsUG9ydGFsU2Vydmljb3Nwc3EAfgAAcHQAN29yZy5hcGFjaGUubXlmYWNlcy5jb21wb25lbnQuaHRtbC5leHQuSHRtbENvbW1hbmRCdXR0b250AA5hbHRlcmFyRG9jZW50ZXBzcQB+AABwcQB+ACB0AA1hbHRlcmFybWVtYnJvcHQAKGphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxQYW5lbEdyaWR0AAdfaWRKc3AzcHEAfgAkdAAHX2lkSnNwMnB0ACNqYXZheC5mYWNlcy5jb21wb25lbnQuaHRtbC5IdG1sRm9ybXQAGHBlcmZpbFBvcnRhbFNlcnZpY29zRm9ybXBxAH4AJHQAB19pZEpzcDFwc3EAfgAAcHQAKmphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxJbnB1dEhpZGRlbnQAB19pZEpzcDVwc3EAfgAAdXEAfgAFAAAAA3NxAH4AAHVxAH4ABQAAAAB0ACFvcmcuYXBhY2hlLm15ZmFjZXMuY3VzdG9tLmRpdi5EaXZ0AAdfaWRKc3A2cHNxAH4AAHVxAH4ABQAAAAJzcQB+AAB1cQB+AAUAAAABc3EAfgAAdXEAfgAFAAAAAnNxAH4AAHVxAH4ABQAAAANzcQB+AAB1cQB+AAUAAAAAcQB+ADF0AAhfaWRKc3AxMnBzcQB+AAB1cQB+AAUAAAAFc3EAfgAAcHQAKmphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxPdXRwdXRMYWJlbHQACmxibFVzdWFyaW9wc3EAfgAAcHQAKGphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxJbnB1dFRleHR0AAd1c3VhcmlvcHNxAH4AAHBxAH4AQXQACGxibFNlbmhhcHNxAH4AAHB0ACpqYXZheC5mYWNlcy5jb21wb25lbnQuaHRtbC5IdG1sSW5wdXRTZWNyZXR0AAVzZW5oYXBzcQB+AABwcQB+AB10AAVsb2dpbnBxAH4AJ3QACWxvZ2luRm9ybXBzcQB+AAB1cQB+AAUAAAABc3EAfgAAdXEAfgAFAAAACXNxAH4AAHBxAH4AE3EAfgAUcHNxAH4AAHVxAH4ABQAAAAFzcQB+AABwcQB+ABh0AAhfaWRKc3AxNXBxAH4AGnQADWFsdGVyYXJQZXJmaWxwc3EAfgAAcHEAfgAddAAQY21kQWx0ZXJhclBlcmZpbHBzcQB+AABwcQB+ABN0AAhfaWRKc3AxNnBzcQB+AABwcQB+ABN0AAxsYmxTdWJQZXJmaWxwc3EAfgAAcHEAfgATdAAIX2lkSnNwMTdwc3EAfgAAcHEAfgAgcQB+ACFwc3EAfgAAcHEAfgAgcQB+ACNwc3EAfgAAcHEAfgATdAAUVVNVQVJJT0xPR0FETy1DT0RQRVNwcQB+ACR0AAhfaWRKc3AxNHBxAH4AJ3QACmxvZ291dEZvcm1wcQB+ADFxAH4ATHBzcQB+AAB1cQB+AAUAAAACc3EAfgAAdXEAfgAFAAAAAHEAfgAxdAAIX2lkSnNwMTlwc3EAfgAAdXEAfgAFAAAAA3NxAH4AAHBxAH4ARHQACm5leHRBY3Rpb25wc3EAfgAAcHQAKmphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxDb21tYW5kTGlua3QACHJlZGlyZWN0cHNxAH4AAHVxAH4ABQAAAABxAH4AMXQACF9pZEpzcDIzcHEAfgAxdAAIX2lkSnNwMjFwcQB+ACd0AAhtZW51Rm9ybXBxAH4AMXQACF9pZEpzcDEwcHQAKWphdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxQYW5lbEdyb3VwdAAHX2lkSnNwOXBzcQB+AAB1cQB+AAUAAAADc3EAfgAAdXEAfgAFAAAAAnNxAH4AAHB0AClvcmcuYXBhY2hlLm15ZmFjZXMuY3VzdG9tLmh0bWxUYWcuSHRtbFRhZ3QACF9pZEpzcDI4cHNxAH4AAHB0ADJvcmcuYXBhY2hlLm15ZmFjZXMuY29tcG9uZW50Lmh0bWwuZXh0Lkh0bWxNZXNzYWdlc3QACG1lbnNhZ2VtcHEAfgAkdAAIX2lkSnNwMjdwc3EAfgAAdXEAfgAFAAAAAnNxAH4AAHBxAH4AE3QACF9pZEpzcDMwcHNxAH4AAHBxAH4AE3QACF9pZEpzcDMxcHEAfgB4dAAIX2lkSnNwMjlwc3EAfgAAcHQAK2phdmF4LmZhY2VzLmNvbXBvbmVudC5odG1sLkh0bWxHcmFwaGljSW1hZ2V0AAhfaWRKc3AzMnBxAH4AJHQACF9pZEpzcDI2cHEAfgAkdAAHX2lkSnNwOHBzcQB+AAB1cQB+AAUAAAADc3EAfgAAdXEAfgAFAAAAAnNxAH4AAHVxAH4ABQAAAABxAH4AeHQACF9pZEpzcDM3cHNxAH4AAHVxAH4ABQAAAANzcQB+AABwcQB+ABN0AAhfaWRKc3A0MHBzcQB+AABwcQB+ABN0AARwaXBlcHNxAH4AAHVxAH4ABQAAAAFzcQB+AABwcQB+ABN0AAhfaWRKc3A0MXB0AClqYXZheC5mYWNlcy5jb21wb25lbnQuaHRtbC5IdG1sT3V0cHV0TGlua3QACnJlZ2ltZW50bzFwcQB+ACR0AAhfaWRKc3AzOXBxAH4AJHQACF9pZEpzcDM2cHNxAH4AAHVxAH4ABQAAAAJzcQB+AAB1cQB+AAUAAAAAcQB+AHh0AAhfaWRKc3A0M3BzcQB+AAB1cQB+AAUAAAAIc3EAfgAAdXEAfgAFAAAAAXNxAH4AAHBxAH4AE3QACF9pZEpzcDQ2cHEAfgCidAAFbGluazFwc3EAfgAAdXEAfgAFAAAAAXNxAH4AAHBxAH4AE3QACF9pZEpzcDQ3cHEAfgCidAAFbGluazJwc3EAfgAAcHEAfgATdAAIX2lkSnNwNDhwc3EAfgAAcHEAfgATdAAIX2lkSnNwNDlwc3EAfgAAcHEAfgATdAAIX2lkSnNwNTBwc3EAfgAAcHEAfgATdAAIX2lkSnNwNTFwc3EAfgAAcHEAfgATdAAIX2lkSnNwNTJwc3EAfgAAdXEAfgAFAAAAAXNxAH4AAHBxAH4AE3QACF9pZEpzcDUzcHEAfgCidAAJcmVnaW1lbnRvcHEAfgAkdAAIX2lkSnNwNDVwcQB+ACR0AAhfaWRKc3A0MnBzcQB+AAB1cQB+AAUAAAAAcQB+ACR0AAhfaWRKc3A1NHBxAH4AJHQACF9pZEpzcDM1cHEAfgAkdAAZamFudXMtY29udGFpbmVyLXByaW5jaXBhbHB0ACBqYXZheC5mYWNlcy5jb21wb25lbnQuVUlWaWV3Um9vdHBw" /><input type="hidden" name="jsf_state_64" id="jsf_state_64" value="rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAN1cQB+AAAAAAAFdXEAfgAAAAAAB3BwcHBwcHBzcgAQamF2YS51dGlsLkxvY2FsZX74EWCcMPnsAwAGSQAIaGFzaGNvZGVMAAdjb3VudHJ5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAKZXh0ZW5zaW9uc3EAfgAFTAAIbGFuZ3VhZ2VxAH4ABUwABnNjcmlwdHEAfgAFTAAHdmFyaWFudHEAfgAFeHD/////dAACQlJ0AAB0AAJwdHEAfgAIcQB+AAh4dAAKSFRNTF9CQVNJQ3QANC9wYWdpbmFzL2NvbXBvbmVudGUvZGlzY2lwbGluYXNPZmVyZWNpZGFzSW5pY2lhbC5qc3BzcgAOamF2YS5sYW5nLkxvbmc7i+SQzI8j3wIAAUoABXZhbHVleHIAEGphdmEubGFuZy5OdW1iZXKGrJUdC5TgiwIAAHhwAAAAAAAAAABwc3IAE2phdmEudXRpbC5BcnJheUxpc3R4gdIdmcdhnQMAAUkABHNpemV4cAAAAAR3BAAAAAR1cQB+AAAAAAADdXEAfgAAAAAAAnVxAH4AAAAAAAd0AAdfaWRKc3AwcHQAH29yZy5hcGFjaGUubXlmYWNlcy5Eb2N1bWVudEhlYWRxAH4AFHNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAx3CAAAABAAAAABdAAMZm9yY2VJZEluZGV4c3IAEWphdmEubGFuZy5Cb29sZWFuzSBygNWc+u4CAAFaAAV2YWx1ZXhwAXhwcHBwcHVxAH4AAAAAAAN1cQB+AAAAAAAddXEAfgAAAAAAB3QAB19pZEpzcDFwdAAQamF2YXguZmFjZXMuR3JpZHEAfgAec3EAfgAWP0AAAAAAAAx3CAAAABAAAAACdAAyamF2YXguZmFjZXMud2ViYXBwLlVJQ29tcG9uZW50VGFnLkZPUk1FUl9DSElMRF9JRFNzcgARamF2YS51dGlsLkhhc2hTZXS6RIWVlri3NAMAAHhwdwwAAAAQP0AAAAAAAAF0ABhwZXJmaWxQb3J0YWxTZXJ2aWNvc0Zvcm14cQB+ABhxAH4AGnhwcHBwcHBwcHBwcHBw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" /><input type="hidden" name="jsf_viewid" id="jsf_viewid" value="/paginas/componente/disciplinasOferecidasInicial.jsp" /></form></div></span></td><td class="areaConteudo"><table border="0" cellpadding="0" cellspacing="0" class="conteudo"><tbody><tr><td><span class="infopt titulo portugues">Disciplinas oferecidas</span><span style="display:none" class="infoen titulo ingles">Disciplines offered</span></td></tr>
+<tr><td><img src="/janus/imagens/barraTitulo.gif;jsessionid=DF60BEF6DFFA598F4A232E4145DBFCB2" alt="barra" /></td></tr>
+<tr><td>
+
+<script>
+function mostrarInfo(lang) {
+	if(lang == "pt") {
+		$(".infopt").show();
+		$(".infoen").hide();
+	}
+	if(lang == "en") {
+		$(".infoen").show();
+		$(".infopt").hide();
+	} 
+}	
+</script>
+
+
+
+<IFRAME 
+	name="casca" 
+	id="casca"
+	src="../TurmaDet?sgldis=SEP5864&ofe=1&"
+    frameBorder="0" 
+    width="800" 
+    height="700" 
+    scrolling="auto"></IFRAME>
+
+</td></tr>
+<tr><td>
+					
+<div class='componenteBuscaAluno'>
+
+	<div class='selecaoComponenteBuscaAluno'>
+		<div class="alunoSelecionado">
+		 <label class="lbl_codAlunoSelecionado"> NUSP: </label>
+		   <span class="span_codAlunoSelecionado"> </span>
+		 <label class="lbl_nomAlunoSelecionado"> Nome: </label> 
+		   <span class="span_nomAlunoSelecionado"></span>
+		 <a  class="fechaAlunoSelecionado"> Fechar pessoa </a>
+		</div>
+		                                                      
+		<H2> Curso do Aluno</h2>
+	    <img class="newLine startLine" src="/janus/imagens/barraTitulo.gif" alt="barra">
+	      
+		<table class="table_list tabelaComlinhaSelecionavel tabelaCurso" id="tabelaCursoAlunoSelecionado">
+		  <thead>
+		  <tr class="tr_head_curso">
+		    <th></th>
+		    <td class="tabelaCabecalho">Curso</td>
+		    <td class="tabelaCabecalho">&#193;rea</td>
+		    <td class="tabelaCabecalho">N&#186; Sequ&#234;ncial</td>
+		    <td class="tabelaCabecalho">Situa&#231;&#227;o</td>
+		    <td class="tabelaCabecalho">Visualiza&#231;&#227;o</td>       
+		  </tr>  
+		  </thead>
+		  <tbody class="tbody_curso">
+		  </tbody>  
+		</table>
+		
+		<table class="table_list tabelaComlinhaSelecionavel" id="tabelaBuscaAlunos">
+		  <thead>
+		  <tr class="tr_head_curso">
+		    <td class="tabelaCabecalho">NUSP</td>
+		    <td class="tabelaCabecalho">Pessoa</td>
+		    <td class="tabelaCabecalho">Visualiza&#231;&#227;o</td>   
+		  </tr>  
+		  </thead>
+		  <tbody class="tbody_alunos">
+		  </tbody>  
+		</table>
+	</div>		
+		
+	<div class="buscaAlunoSelecionado">
+	      <p class="titulo" id="buscaAlunoSelecionado"> Busca</p>
+	      <p> <img src="/janus/imagens/barraTitulo.gif" alt="barra"> <p>
+	      <p>
+	         <label>NUSP:</label> <input type="text" class="input_NUSP" maxlength="8" size="8"> <label>Nome:</label> <input type="text" class="input_Nome" maxlength="50" size="50">
+	      </p>
+	      <p>
+	         <input type="button" class="buttonDestacado buscaRapida button"  value="Busca r&#225;pida">  <input type="button" class="button buscaExata" value="Busca exata">
+	      </p>
+	      <p>
+	      	Utilize o caractere asterisco (*) para substituir parte final do nome. Por exemplo, uma busca por Jos&#233; Sampaio * ir&#225; encontrar tanto <i>Jos&#233; Sampaio Oliveira </i> quanto <i>Jos&#233; Sampaio da Silva. </i>
+	      </p>
+	      
+	      <p class="msg_buscaNaoEncontrada">
+	            0 aluno(s) encontrado(s)
+	      </p>
+	      
+	      <div id="ajaxload_buscaAluno">
+	      	  <p>Carregando...</p>
+			  <img src="/janus/imagens/ajax-loader.gif"/>
+	      </div>
+	  
+	 
+	      <div class = "alunoEncontrado" id="tabelaAlunoEncontrado">
+	 		  <p><span class="numeroAlunoEncontrado"></span> </p>
+	      <table class="table_list tabelaComlinhaSelecionavel"> 
+	        <tr class="tr_head_aluno_encontrado">
+	          <td class="tabelaCabecalho"> NUSP</td>
+	          <td class="Nome">Nome </td>
+	        </tr>
+	        </table>
+		</div>
+	  
+	</div>
+	
+	<DIV class='cursel'><SPAN class='lblcur'>Curso:</SPAN><SPAN class='codaresel'></SPAN>-<SPAN class='codpessel'></SPAN><SPAN class='numseqpgmsel'></SPAN><SPAN class='nivaresel'></SPAN></DIV>
+</div>
+					
+				</td></tr>
+</tbody></table></td></tr>
+</tbody></table></td></tr>
+<tr><td><table border="0" class="rodape"><tbody><tr><td><table border="0" cellpadding="0px" cellspacing="0px" style="width: 800px; text-align: center;" class="rodape"><tbody><tr><td><hr size="1"/></td></tr>
+<tr><td><table border="0"><tbody><tr><td><span style="font-size: 12px" class="anoJanus">2006-__ANO__ - P&#243;s-Gradua&#231;&#227;o/USP</span></td><td><span id="pipe">|</span></td><td><a id="regimento1" name="regimento1" href="http://www.leginf.usp.br/?resolucao=resolucao-no-7493-de-27-de-marco-de-2018" target="blank" class="link">Regimento da P&#243;s-Gradua&#231;&#227;o</a></td></tr>
+</tbody></table></td></tr>
+</tbody></table></td></tr>
+<tr><td><table border="0"><tbody><tr><td>
+		<script>
+			//coloca ano corrente na p&#225;gina
+			$(".anoJanus").text(function(index, text) {
+				return text.replace("__ANO__", new Date().getFullYear());
+			}).show();
+		</script>
+	</td></tr>
+</tbody></table></td></tr>
+</tbody></table></td></tr>
+</tbody></table>
+<!-- MYFACES JAVASCRIPT -->
+
+<script type="text/javascript"><!--
+function getScrolling() {
+    var x = 0; var y = 0;
+    if (self.pageXOffset || self.pageYOffset) {
+        x = self.pageXOffset;
+        y = self.pageYOffset;
+    } else if ((document.documentElement && document.documentElement.scrollLeft)||(document.documentElement && document.documentElement.scrollTop)) {
+        x = document.documentElement.scrollLeft;
+        y = document.documentElement.scrollTop;
+    } else if (document.body) {
+        x = document.body.scrollLeft;
+        y = document.body.scrollTop;
+    }
+    return x + "," + y;
+}
+
+//--></script>
+
+</body>
+
+
+<script type="text/javascript" src="/janus/javascript/lib/url-polyfill/url-polyfill.min.js"></script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-9CGLJQEPEE"></script>
+<script>
+var __ambienteProd = window.location.href.indexOf("https://uspdigital") >= 0;
+var __codigoGAsistema = "G-9CGLJQEPEE";
+
+var _urlAjax = null;
+
+if (__ambienteProd) {	
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){
+		dataLayer.push(arguments);
+	}
+	gtag('js', new Date());
+	gtag('config', __codigoGAsistema);
+	  
+	//codigo abaixo faz o track de analytics para qualquer chamada ajax (inclusive dwr)
+	//se o batch do dwr estiver habilitado, provavelmente a chamada abaixo vai parar de funcionar
+	//inspirado em http://stackoverflow.com/questions/25335648/how-to-intercept-all-ajax-requests-made-by-different-js-libraries
+	(function(open) {
+		XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+			this._urlAjax = url;
+			open.call(this, method, url, async, user, pass);
+		};
+	})(XMLHttpRequest.prototype.open);
+	
+	(function(send) {
+		XMLHttpRequest.prototype.send = function(data) {
+			if (this._urlAjax.indexOf("ControleAutorizadoDWR") > 0) this._urlAjax += data.split("\n")[5] ? "." + data.split("\n")[5].replace("c0-param0=string:","") : "";
+			else if (this._urlAjax.indexOf("ControlePublicoDWR") > 0) this._urlAjax += data.split("\n")[5] ? "." + data.split("\n")[5].replace("c0-param0=string:","") : "";
+			//ga('sistema.send', 'pageview', this._urlAjax);
+			/*window.dataLayer.push({
+	 			'event': 'virtualPageView',
+		 		'pageUrl': this._urlAjax,
+		 		'pageTitle': this._urlAjax
+		 	});*/
+		 	gtag('event', 'ajax', {'url': this._urlAjax});
+			send.call(this, data);	   	
+		};
+	})(XMLHttpRequest.prototype.send);
+}
+</script>
+</html>

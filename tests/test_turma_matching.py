@@ -58,16 +58,24 @@ def extrair_info_turma_celula(texto_celula):
         eh_pos = False  # 7 dígitos são da graduação
 
     # Extrai turma(s)
-    # Casos: - T1, - T01, - T1 e T2, - T1 e 2, - T10, T2[1], T1 tv, T2 pv
     turmas = []
-    # Busca segmento após "- T" ou "T", aceitando hífen, underscore ou espaço
-    padrao_turma = re.search(r'(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?', texto, re.IGNORECASE)
+    # 1. Padrão com T ou Turma explícito (ex: - T1, - T01, T1 e T2, Turma 1)
+    padrao_turma = re.search(r'(?:-\s*|\/\s*)?(?:T\s*[\-_]?\s*|Turma\s+)(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?', texto, re.IGNORECASE)
     if padrao_turma:
         t1 = padrao_turma.group(1)
         turmas.append(t1.zfill(2))
         if padrao_turma.group(2):
             t2 = padrao_turma.group(2)
             turmas.append(t2.zfill(2))
+    elif not eh_evento:
+        # 2. Padrão numérico isolado após hífen ou barra (ex: "SEP5864 - 1" ou "SEP5864 / 1")
+        padrao_num_pos = re.search(r'(?:-\s*|\/\s*)(\d{1,2})(?:\s*(?:e|E|\/)\s*(\d{1,2}))?(?:\s*$|\s+(?:pv|tv|pós|pos|\/))', texto, re.IGNORECASE)
+        if padrao_num_pos:
+            t1 = padrao_num_pos.group(1)
+            turmas.append(t1.zfill(2))
+            if padrao_num_pos.group(2):
+                t2 = padrao_num_pos.group(2)
+                turmas.append(t2.zfill(2))
 
     # Aula da semana [1], [2]
     match_aula = re.search(r'\[(\d+)\]', texto)
@@ -91,20 +99,18 @@ def extrair_info_turma_celula(texto_celula):
 
 def casar_turma_com_dados(dados_disciplina, info_celula):
     """
-    Realiza o casamento entre a intenção da célula e os dados do Júpiter.
+    Realiza o casamento entre a intenção da célula e os dados do Júpiter ou Janus.
     Gera o texto de hover e a turma padrão para o card modal.
     """
     if not dados_disciplina or not info_celula or not info_celula.get("eh_valida"):
         return {"sucesso": False, "label_hover": "", "turma_padrao": None}
 
-    if info_celula.get("eh_pos"):
-        return {"sucesso": False, "label_hover": "Disciplina de Pós-Graduação (Janus)", "turma_padrao": None}
-
     if dados_disciplina.get("semOferecimento"):
-        return {"sucesso": False, "sem_oferecimento": True, "label_hover": "Sem oferecimento no semestre", "turma_padrao": None}
+        nome_sis = "Janus" if info_celula.get("eh_pos") else "Jupiterweb"
+        return {"sucesso": False, "sem_oferecimento": True, "label_hover": f"Sem oferecimento no {nome_sis}", "turma_padrao": None}
 
-    turmas_jupiter = dados_disciplina.get("turmas", {})
-    if not turmas_jupiter:
+    turmas_disciplina = dados_disciplina.get("turmas", {})
+    if not turmas_disciplina:
         return {"sucesso": False, "label_hover": "Sem turmas cadastradas", "turma_padrao": None}
 
     turmas_solicitadas = info_celula.get("turmas_solicitadas", [])
@@ -116,9 +122,9 @@ def casar_turma_com_dados(dados_disciplina, info_celula):
 
         for t_sol in turmas_solicitadas:
             # Procura por chave '01' ou '1' ou por objeto com numero == t_sol
-            t_obj = turmas_jupiter.get(t_sol) or turmas_jupiter.get(str(int(t_sol)))
+            t_obj = turmas_disciplina.get(t_sol) or turmas_disciplina.get(str(int(t_sol)))
             if not t_obj:
-                for k, v in turmas_jupiter.items():
+                for k, v in turmas_disciplina.items():
                     if str(v.get("numero", "")).zfill(2) == t_sol:
                         t_obj = v
                         break
@@ -147,8 +153,8 @@ def casar_turma_com_dados(dados_disciplina, info_celula):
             "docentes": sorted(list(docentes_set))
         }
 
-    # Caso 2: Célula NÃO especificou turma (ex: SMA0300)
-    todas_turmas = list(turmas_jupiter.values())
+    # Caso 2: Célula NÃO especificou turma (ex: SMA0300 ou SEP5864)
+    todas_turmas = list(turmas_disciplina.values())
     if len(todas_turmas) == 1:
         t_unica = todas_turmas[0]
         docentes = [d for d in t_unica.get("docentes", []) if d and d != "A Designar" and d != "-"]
@@ -170,7 +176,6 @@ def casar_turma_com_dados(dados_disciplina, info_celula):
             "sucesso": True,
             "turma_padrao": str(primeira_turma.get("numero", "01")).zfill(2),
             "label_hover": "Docentes: Várias turmas",
-            "docentes": []
         }
 
 
@@ -260,14 +265,49 @@ class TestTurmaMatching(unittest.TestCase):
         self.assertEqual(resultado["label_hover"], "Docente: A designar")
 
     def test_disciplina_pos_graduacao(self):
-        """Valida que códigos de pós-graduação (Janus) são sinalizados e excluídos da fila."""
-        info = extrair_info_turma_celula("SEP5864 - Pós-Grad")
-        self.assertTrue(info["eh_pos"])
-        self.assertEqual(info["codigo"], "SEP5864")
+        """Valida que códigos de pós-graduação (Janus) são identificados e casam com dados do Janus."""
+        # 1. Identificação correta de nível pós-graduação
+        info_pos = extrair_info_turma_celula("SEP5864 - Pós-Grad")
+        self.assertTrue(info_pos["eh_pos"])
+        self.assertEqual(info_pos["codigo"], "SEP5864")
 
-        resultado = casar_turma_com_dados(self.dados_sma0356, info)
-        self.assertFalse(resultado["sucesso"])
-        self.assertIn("Pós-Graduação", resultado["label_hover"])
+        # 2. Formatos flexíveis de turma de pós-graduação
+        for cel_txt in ["SEP5864 - T1", "SEP5864 - 1", "SEP5864 / 1", "SEP5864 - Turma 1"]:
+            inf = extrair_info_turma_celula(cel_txt)
+            self.assertTrue(inf["eh_pos"])
+            self.assertEqual(inf["turmas_solicitadas"], ["01"], f"Falhou para formato de pós: {cel_txt}")
+
+        dados_sep5864 = {
+            "codigo": "SEP5864",
+            "nome": "Design Science Research",
+            "sistema": "janus",
+            "semOferecimento": False,
+            "turmas": {
+                "01": {
+                    "codigoTurma": "SEP5864-1",
+                    "numero": "01",
+                    "docentes": ["Fabio Muller Guerrini"]
+                }
+            }
+        }
+
+        # 3. Casamento com turma especificada (T1 ou 1)
+        res_t1 = casar_turma_com_dados(dados_sep5864, extrair_info_turma_celula("SEP5864 - 1"))
+        self.assertTrue(res_t1["sucesso"])
+        self.assertEqual(res_t1["turma_padrao"], "01")
+        self.assertEqual(res_t1["label_hover"], "Docente: Fabio Muller Guerrini")
+
+        # 4. Casamento com célula sem turma (fallback para turma única do Janus)
+        res_sem_t = casar_turma_com_dados(dados_sep5864, extrair_info_turma_celula("SEP5864"))
+        self.assertTrue(res_sem_t["sucesso"])
+        self.assertEqual(res_sem_t["turma_padrao"], "01")
+        self.assertEqual(res_sem_t["label_hover"], "Docente: Fabio Muller Guerrini")
+
+        # 5. Tratamento de sem oferecimento no Janus
+        dados_sem = {"codigo": "SEM5900", "semOferecimento": True, "turmas": {}}
+        res_sem = casar_turma_com_dados(dados_sem, extrair_info_turma_celula("SEM5900"))
+        self.assertFalse(res_sem["sucesso"])
+        self.assertEqual(res_sem["label_hover"], "Sem oferecimento no Janus")
 
     def test_codigo_sete_digitos(self):
         """Valida código puramente numérico interunidades (7 dígitos)."""

@@ -242,7 +242,7 @@
       <div id="modal-card-sem-oferecimento" class="modal-card-vazio" style="display: none;">
         <div class="modal-vazio-icone">ℹ️</div>
         <h3>Sem oferecimento no semestre</h3>
-        <p>Esta disciplina não possui turmas ativas cadastradas no Jupiterweb para o período letivo vigente.</p>
+        <p id="modal-sem-oferecimento-texto">Esta disciplina não possui turmas ativas cadastradas para o período letivo vigente.</p>
       </div>
 
       <!-- Corpo Principal dos Dados da Disciplina -->
@@ -281,18 +281,18 @@
             <div id="modal-turma-docentes" class="modal-docentes-lista">---</div>
           </div>
 
-          <!-- Horários Oficiais Cadastrados no Júpiter -->
+          <!-- Horários Oficiais Cadastrados -->
           <div class="modal-secao">
-            <h4 class="modal-secao-titulo">🕒 Horários Oficiais (Júpiter)</h4>
+            <h4 class="modal-secao-titulo" id="modal-titulo-horarios">🕒 Horários Oficiais</h4>
             <div id="modal-turma-horarios" class="modal-horarios-tabela">
               <!-- Horários inseridos dinamicamente -->
             </div>
           </div>
 
 
-          <!-- Observações da Turma -->
+          <!-- Observações da Turma / Idioma -->
           <div id="modal-turma-obs-container" class="modal-secao" style="display: none;">
-            <h4 class="modal-secao-titulo">📝 Observações</h4>
+            <h4 class="modal-secao-titulo" id="modal-turma-obs-titulo">📝 Observações</h4>
             <p id="modal-turma-obs" class="modal-obs-texto"></p>
           </div>
 

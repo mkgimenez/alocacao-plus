@@ -329,12 +329,17 @@ const MAPA_ENTIDADES_HTML_GAS = {
   '&nbsp;': ' ',
   '&amp;': '&',
   '&quot;': '"',
+  '&ndash;': '–',
+  '&#8211;': '–',
+  '\u0096': '–',
   '&#193;': 'Á', '&#225;': 'á',
   '&#201;': 'É', '&#233;': 'é',
   '&#205;': 'Í', '&#237;': 'í',
   '&#211;': 'Ó', '&#243;': 'ó',
   '&#218;': 'Ú', '&#250;': 'ú',
-  '&#199;': 'Ç', '&#231;': 'ç'
+  '&#199;': 'Ç', '&#231;': 'ç',
+  '&#195;': 'Ã', '&#227;': 'ã',
+  '&#213;': 'Õ', '&#245;': 'õ'
 };
 
 /**
@@ -350,6 +355,244 @@ function decodificarEntidadesHtml(texto) {
   }
   res = res.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
   return res.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Parser da Etapa 1 do Janus: Página DisciplinaAux.
+ * Extrai nome da disciplina, detecta se há oferecimento ativo e coleta IDs de oferecimento (ofe).
+ *
+ * @param {string} codigo - Sigla da disciplina (ex: "SEP5864")
+ * @param {string} html - Conteúdo HTML da página DisciplinaAux
+ * @returns {Object} { codigo, nome, semOferecimento, oferecimentos: string[] }
+ */
+function parsearHtmlJanusDisciplina(codigo, html) {
+  if (!html || typeof html !== 'string') {
+    return { codigo: codigo, nome: '', semOferecimento: true, oferecimentos: [] };
+  }
+
+  // 1. Detecção de disciplina sem oferecimento ativo
+  if (/N(?:ã|a|&atilde;|&#227;)o\s+existem\s+oferecimentos/i.test(html)) {
+    return { codigo: codigo, nome: '', semOferecimento: true, oferecimentos: [] };
+  }
+
+  // 2. Extração do Nome da Disciplina (ancorado na linha contendo o código)
+  let nomeDisciplina = '';
+  const regexAncorada = new RegExp(codigo + '[\\s\\S]*?<td[^>]*width=["\']?67%["\']?[^>]*>[\\s\\S]*?<div[^>]*>[\\s\\S]*?<font[^>]*>([\\s\\S]*?)<\\/font>', 'i');
+  const mNome = html.match(regexAncorada);
+  if (mNome) {
+    nomeDisciplina = decodificarEntidadesHtml(mNome[1].replace(/<[^>]+>/g, ' '));
+  } else {
+    // Fallback 1: Busca em coluna width="67%" descartando a palavra "Nome"
+    const mNomesTodos = html.match(/<td[^>]*width=["']?67%["']?[^>]*>[\s\S]*?<div[^>]*>[\s\S]*?<font[^>]*>([\s\S]*?)<\/font>/gi) || [];
+    for (let i = 0; i < mNomesTodos.length; i++) {
+      const matchSub = mNomesTodos[i].match(/<font[^>]*>([\s\S]*?)<\/font>/i);
+      if (matchSub) {
+        const candLimpo = decodificarEntidadesHtml(matchSub[1].replace(/<[^>]+>/g, ' '));
+        if (candLimpo && candLimpo.toLowerCase() !== 'nome') {
+          nomeDisciplina = candLimpo;
+          break;
+        }
+      }
+    }
+    // Fallback 2: Busca por alinhamento à esquerda descartando "Nome"
+    if (!nomeDisciplina) {
+      const mLeft = html.match(/<td[^>]*align=["']?left["']?[^>]*>[\s\S]*?<div[^>]*>[\s\S]*?<font[^>]*>([\s\S]*?)<\/font>/gi) || [];
+      for (let j = 0; j < mLeft.length; j++) {
+        const matchLeftSub = mLeft[j].match(/<font[^>]*>([\s\S]*?)<\/font>/i);
+        if (matchLeftSub) {
+          const candLeftLimpo = decodificarEntidadesHtml(matchLeftSub[1].replace(/<[^>]+>/g, ' '));
+          if (candLeftLimpo && candLeftLimpo.toLowerCase() !== 'nome') {
+            nomeDisciplina = candLeftLimpo;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Coleta de IDs de oferecimento (publico/turma/<codigo>/<ofe>)
+  const oferecimentos = [];
+  const padraoLink = /publico\/turma\/[A-Za-z0-9]+\/(\d+)/gi;
+  let matchOfe;
+  while ((matchOfe = padraoLink.exec(html)) !== null) {
+    const num = String(parseInt(matchOfe[1], 10));
+    if (!oferecimentos.includes(num)) {
+      oferecimentos.push(num);
+    }
+  }
+
+  if (oferecimentos.length === 0) {
+    return { codigo: codigo, nome: nomeDisciplina, semOferecimento: true, oferecimentos: [] };
+  }
+
+  return {
+    codigo: codigo,
+    nome: nomeDisciplina,
+    semOferecimento: false,
+    oferecimentos: oferecimentos
+  };
+}
+
+/**
+ * Parser da Etapa 2 do Janus: Página TurmaDet.
+ * Extrai datas, modalidade, docentes ministrantes, horários e locais ancorando em classes .intl_*.
+ *
+ * @param {string} codigo - Sigla da disciplina (ex: "SEP5864")
+ * @param {string} html - Conteúdo HTML da página TurmaDet
+ * @param {string|number} numTurma - Número do oferecimento (ex: "1")
+ * @returns {Object|null} Objeto da turma com schema canônico
+ */
+function parsearHtmlJanusTurma(codigo, html, numTurma) {
+  if (!html || typeof html !== 'string') return null;
+
+  const num = numTurma !== undefined && numTurma !== null ? String(numTurma) : '1';
+  const numCan = /^\d+$/.test(num) ? num.padStart(2, '0') : num;
+  const codigoTurma = codigo + '-' + num;
+
+  // 1. Datas e Cálculo de Período
+  let inicio = '';
+  let fim = '';
+  const mIni = html.match(/class=['"][^'"]*intl_dataInicial[^'"]*['"][^>]*>[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
+  if (mIni) inicio = mIni[1].trim();
+
+  const mFim = html.match(/class=['"][^'"]*intl_dataFinal[^'"]*['"][^>]*>[\s\S]*?(\d{2}\/\d{2}\/\d{4})/i);
+  if (mFim) fim = mFim[1].trim();
+
+  let periodo = 'Semestral';
+  if (inicio && fim) {
+    try {
+      const partesIni = inicio.split('/');
+      const partesFim = fim.split('/');
+      const dIni = new Date(parseInt(partesIni[2], 10), parseInt(partesIni[1], 10) - 1, parseInt(partesIni[0], 10));
+      const dFim = new Date(parseInt(partesFim[2], 10), parseInt(partesFim[1], 10) - 1, parseInt(partesFim[0], 10));
+      const diffDias = Math.round((dFim.getTime() - dIni.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDias > 185) {
+        periodo = 'Anual';
+      }
+    } catch (ePeriodo) {
+      periodo = 'Semestral';
+    }
+  }
+
+  // 2. Modalidade / Forma de Oferecimento (.intl_formaOferecimento)
+  let tipoTurma = 'Presencial';
+  const mForma = html.match(/class=['"][^'"]*intl_formaOferecimento[^'"]*['"][^>]*>[\s\S]*?<font[^>]*>(?:<span[^>]*>)?\s*([^\s<]+)/i);
+  if (mForma) {
+    const formaRaw = decodificarEntidadesHtml(mForma[1]).toLowerCase();
+    if (formaRaw.includes('presenc')) {
+      tipoTurma = 'Presencial';
+    } else if (formaRaw.includes('remot') || formaRaw.includes('dist') || formaRaw.includes('ead')) {
+      tipoTurma = 'Remota';
+    } else if (formaRaw.includes('hibrid')) {
+      tipoTurma = 'Híbrida';
+    } else {
+      tipoTurma = decodificarEntidadesHtml(mForma[1]);
+    }
+  }
+
+  // 3. Docentes Ministrantes (.intl_docenteMinistrante)
+  const docentes = [];
+  const mDocBloco = html.match(/class=['"][^'"]*intl_docenteMinistrante[^'"]*['"][\s\S]*?<\/table>/i);
+  if (mDocBloco) {
+    const blocoHtml = mDocBloco[0];
+    const reLinhasDoc = /<td[^>]*nowrap[^>]*>[\s\S]*?<font[^>]*>(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/font>/gi;
+    let mLinha;
+    while ((mLinha = reLinhasDoc.exec(blocoHtml)) !== null) {
+      const docLimpo = decodificarEntidadesHtml(mLinha[1].replace(/<[^>]+>/g, ' '));
+      if (docLimpo && docLimpo !== '-' && docLimpo.toLowerCase() !== 'a designar' && !docentes.includes(docLimpo)) {
+        docentes.push(docLimpo);
+      }
+    }
+  }
+
+  // 4. Tabela de Horários e Locais (.intl_horario / .intl_local)
+  const horarios = [];
+  const locaisEncontrados = [];
+  const mHorBloco = html.match(/class=['"][^'"]*(?:intl_horario|intl_local)[^'"]*['"][\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i);
+  if (mHorBloco) {
+    const tabelaHorarios = mHorBloco[1];
+    const reTr = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let mTr;
+    while ((mTr = reTr.exec(tabelaHorarios)) !== null) {
+      const conteudoTr = mTr[1];
+      const reTd = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+      const tds = [];
+      let mTd;
+      while ((mTd = reTd.exec(conteudoTr)) !== null) {
+        tds.push(mTd[1]);
+      }
+
+      if (tds.length >= 3) {
+        const dia = decodificarEntidadesHtml(tds[0].replace(/<[^>]+>/g, ' '));
+        const horaStr = decodificarEntidadesHtml(tds[1].replace(/<[^>]+>/g, ' '));
+        const local = decodificarEntidadesHtml(tds[2].replace(/<[^>]+>/g, ' '));
+
+        let inicioHora = '';
+        let fimHora = '';
+        if (horaStr.includes('-')) {
+          const partesHora = horaStr.split('-');
+          inicioHora = partesHora[0].trim();
+          fimHora = partesHora.length > 1 ? partesHora[1].trim() : '';
+        } else if (/às|as/i.test(horaStr)) {
+          const partesHora = horaStr.split(/\s+(?:às|as)\s+/i);
+          inicioHora = partesHora[0].trim();
+          fimHora = partesHora.length > 1 ? partesHora[1].trim() : '';
+        } else {
+          inicioHora = horaStr.trim();
+        }
+
+        if (local && !locaisEncontrados.includes(local)) {
+          locaisEncontrados.push(local);
+        }
+
+        horarios.push({
+          dia: dia,
+          inicio: inicioHora,
+          fim: fimHora,
+          docente: docentes.length > 0 ? docentes[0] : 'A Designar',
+          professores: docentes.slice(),
+          local: local
+        });
+      }
+    }
+  }
+
+  // 5. Idioma ministrado (.intl_idiomaMinistrado)
+  let idioma = 'Português';
+  const mIdioma = html.match(/intl_idiomaMinistrado[\s\S]*?<span[^>]*class=['"]txt_arial_10pt_black['"][^>]*>([^<]+)<\/span>/i);
+  if (mIdioma) {
+    const rawId = decodificarEntidadesHtml(mIdioma[1]).trim();
+    if (/ingl|engl/i.test(rawId)) {
+      idioma = 'Inglês';
+    } else if (/portug/i.test(rawId)) {
+      idioma = 'Português';
+    } else if (/espanh|span/i.test(rawId)) {
+      idioma = 'Espanhol';
+    } else if (/franc/i.test(rawId)) {
+      idioma = 'Francês';
+    } else if (rawId) {
+      idioma = rawId;
+    }
+  }
+
+  let obs = '';
+  if (locaisEncontrados.length > 0) {
+    obs = 'Local: ' + locaisEncontrados.sort().join(', ');
+  }
+
+  return {
+    codigoTurma: codigoTurma,
+    numero: numCan,
+    ofe: String(parseInt(num, 10) || num),
+    tipo: tipoTurma,
+    periodo: periodo,
+    inicio: inicio,
+    fim: fim,
+    docentes: docentes,
+    horarios: horarios,
+    idioma: idioma,
+    observacoes: obs
+  };
 }
 
 /**
@@ -548,11 +791,20 @@ function extrairInfoTurmaDaCelula(textoCelula) {
   }
 
   const turmas = [];
-  const padraoTurma = /(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?/i;
+  // 1. Padrão com T ou Turma explícito (ex: - T1, - T01, T1 e T2, Turma 1)
+  const padraoTurma = /(?:-\s*|\/\s*)?(?:T\s*[\-_]?\s*|Turma\s+)(\d{1,2})(?:\s*(?:e|E|\/)\s*T?\s*[\-_]?\s*(\d{1,2}))?/i;
   const matchTurma = texto.match(padraoTurma);
   if (matchTurma) {
     if (matchTurma[1]) turmas.push(matchTurma[1].padStart(2, '0'));
     if (matchTurma[2]) turmas.push(matchTurma[2].padStart(2, '0'));
+  } else if (!ehEvento) {
+    // 2. Padrão numérico isolado após hífen ou barra (ex: "SEP5864 - 1" ou "SEP5864 / 1")
+    const padraoNumPos = /(?:-\s*|\/\s*)(\d{1,2})(?:\s*(?:e|E|\/)\s*(\d{1,2}))?(?:\s*$|\s+(?:pv|tv|pós|pos|\/))/i;
+    const matchNum = texto.match(padraoNumPos);
+    if (matchNum) {
+      if (matchNum[1]) turmas.push(matchNum[1].padStart(2, '0'));
+      if (matchNum[2]) turmas.push(matchNum[2].padStart(2, '0'));
+    }
   }
 
   const matchAula = texto.match(/\[(\d+)\]/);
@@ -574,7 +826,7 @@ function extrairInfoTurmaDaCelula(textoCelula) {
 }
 
 /**
- * Realiza o casamento entre a intenção da célula e os dados do Júpiter.
+ * Realiza o casamento entre a intenção da célula e os dados do Júpiter ou Janus.
  * Retorna { sucesso, turmaPadrao, labelHover, docentes, turmasEncontradas }
  */
 function casarTurmaComDados(dadosDisciplina, infoCelula) {
@@ -582,16 +834,13 @@ function casarTurmaComDados(dadosDisciplina, infoCelula) {
     return { sucesso: false, labelHover: '', turmaPadrao: null };
   }
 
-  if (infoCelula.ehPos) {
-    return { sucesso: false, labelHover: 'Disciplina de Pós-Graduação (Janus)', turmaPadrao: null };
-  }
-
   if (dadosDisciplina.semOferecimento) {
-    return { sucesso: false, semOferecimento: true, labelHover: 'Sem oferecimento no semestre', turmaPadrao: null };
+    const nomeSis = infoCelula.ehPos ? 'Janus' : 'Jupiterweb';
+    return { sucesso: false, semOferecimento: true, labelHover: 'Sem oferecimento no ' + nomeSis, turmaPadrao: null };
   }
 
-  const turmasJupiter = dadosDisciplina.turmas || {};
-  const listaChaves = Object.keys(turmasJupiter);
+  const turmasDisciplina = dadosDisciplina.turmas || {};
+  const listaChaves = Object.keys(turmasDisciplina);
   if (listaChaves.length === 0) {
     return { sucesso: false, labelHover: 'Sem turmas cadastradas', turmaPadrao: null };
   }
@@ -603,10 +852,10 @@ function casarTurmaComDados(dadosDisciplina, infoCelula) {
     const docentesSet = new Set();
 
     turmasSolicitadas.forEach(tSol => {
-      let tObj = turmasJupiter[tSol] || turmasJupiter[String(parseInt(tSol, 10))];
+      let tObj = turmasDisciplina[tSol] || turmasDisciplina[String(parseInt(tSol, 10))];
       if (!tObj) {
         for (const k of listaChaves) {
-          const v = turmasJupiter[k];
+          const v = turmasDisciplina[k];
           if (v && (String(v.numero).padStart(2, '0') === tSol || String(v.codigoTurma || '').endsWith(tSol))) {
             tObj = v;
             break;
@@ -645,8 +894,8 @@ function casarTurmaComDados(dadosDisciplina, infoCelula) {
     };
   }
 
-  // Célula sem turma especificada (ex: SMA0300)
-  const todasTurmas = Object.values(turmasJupiter);
+  // Célula sem turma especificada (ex: SMA0300 ou SEP5864)
+  const todasTurmas = Object.values(turmasDisciplina);
   if (todasTurmas.length === 1) {
     const tUnica = todasTurmas[0];
     const docs = (tUnica.docentes || []).filter(d => d && d !== 'A Designar' && d !== '-');
@@ -732,7 +981,7 @@ function formatarTextoComLinksHtml(textoOriginal, urlJupiter, urlJanus) {
     const classeCss = item.ehPos ? 'link-disc link-pos' : 'link-disc link-grad';
     const sistemaNome = item.ehPos ? 'Janus (Pós-Graduação USP)' : 'Jupiterweb (Graduação USP)';
     const titulo = 'Consultar ' + item.codigo + ' no ' + sistemaNome + ' • Abre em nova aba ↗';
-    const attrData = item.ehPos ? '' : ' data-codigo="' + escapeHtml(item.codigo) + '" role="button" tabindex="0"';
+    const attrData = ' data-codigo="' + escapeHtml(item.codigo) + '" role="button" tabindex="0"';
 
     htmlResult += '<a href="' + linkUrl + '" target="_blank" rel="noopener noreferrer" class="' + classeCss + '"' + attrData + ' title="' + escapeHtml(titulo) + '">' + escapeHtml(item.textoEncontrado) + '</a>';
 
@@ -892,6 +1141,7 @@ function obterDadosGradeWeb(forcarAtualizacao) {
     // Construção da Matriz Otimizada da Grade para envio ao Frontend
     const matrizGradeOtimizada = [];
     const codigosGraduacaoEncontrados = new Set();
+    const codigosPosEncontrados = new Set();
 
     for (let r = 0; r < numLinhas; r++) {
       const linhaArray = [];
@@ -929,12 +1179,16 @@ function obterDadosGradeWeb(forcarAtualizacao) {
 
         if (parsed.codigos.length > 0) {
           celObj.d = parsed.codigos;
-          if (!parsed.ehPos) {
-            parsed.codigos.forEach(cd => {
-              const cNorm = String(cd).trim().toUpperCase();
-              if (cNorm) codigosGraduacaoEncontrados.add(cNorm);
-            });
-          }
+          parsed.codigos.forEach(cd => {
+            const cNorm = String(cd).trim().toUpperCase();
+            if (cNorm) {
+              if (parsed.ehPos) {
+                codigosPosEncontrados.add(cNorm);
+              } else {
+                codigosGraduacaoEncontrados.add(cNorm);
+              }
+            }
+          });
         }
         if (parsed.ehPos) celObj.pos = true;
         const infoTurma = extrairInfoTurmaDaCelula(rawText);
@@ -950,17 +1204,22 @@ function obterDadosGradeWeb(forcarAtualizacao) {
       matrizGradeOtimizada.push(linhaArray);
     }
 
-    // Se for atualização forçada, invalida também o cache do Jupiterweb no ScriptCache
-    if (forcarAtualizacao && codigosGraduacaoEncontrados.size > 0) {
+    // Se for atualização forçada, invalida também o cache do Jupiterweb e Janus no ScriptCache
+    if (forcarAtualizacao && (codigosGraduacaoEncontrados.size > 0 || codigosPosEncontrados.size > 0)) {
       try {
         const PREFIXO_CACHE_JUPITER = 'JUP_V18_';
-        const chavesParaRemover = Array.from(codigosGraduacaoEncontrados).map(c => PREFIXO_CACHE_JUPITER + c);
+        const PREFIXO_CACHE_JANUS = 'JAN_V2_';
+        const chavesParaRemover = [
+          ...Array.from(codigosGraduacaoEncontrados).map(c => PREFIXO_CACHE_JUPITER + c),
+          ...Array.from(codigosPosEncontrados).map(c => 'JAN_V1_' + c),
+          ...Array.from(codigosPosEncontrados).map(c => PREFIXO_CACHE_JANUS + c)
+        ];
         for (let i = 0; i < chavesParaRemover.length; i += 100) {
           cache.removeAll(chavesParaRemover.slice(i, i + 100));
         }
-        Logger.log('Invalidação forçada do cache Júpiter: ' + chavesParaRemover.length + ' chaves removidas do ScriptCache.');
+        Logger.log('Invalidação forçada do cache (Júpiter + Janus): ' + chavesParaRemover.length + ' chaves removidas do ScriptCache.');
       } catch (eLimpeza) {
-        Logger.log('Aviso ao invalidar chaves do Jupiter no CacheService: ' + eLimpeza.message);
+        Logger.log('Aviso ao invalidar chaves no CacheService: ' + eLimpeza.message);
       }
     }
 
@@ -1014,19 +1273,28 @@ function obterDadosGradeWeb(forcarAtualizacao) {
  * 
  * @param {Array<string>} listaCodigos - Lista de códigos de graduação (ex: ["SMA0356", "7600006"])
  * @returns {Object} { sucesso: boolean, dados: { [codigo]: objetoDisciplina } }
+/**
+ * Endpoint assíncrono chamado pelo Frontend para obter turmas em lote
+ * (Graduação via Jupiterweb e Pós-Graduação via Janus em pipeline otimizado de 2 etapas).
+ * Utiliza busca paralela via UrlFetchApp.fetchAll e armazenamento em ScriptCache (TTL de 6h).
+ * 
+ * @param {Array<string>} listaCodigos - Lista de códigos (ex: ["SMA0356", "SEP5864", "7600006"])
+ * @returns {Object} { sucesso: boolean, dados: { [codigo]: objetoDisciplina } }
  */
-function obterLoteJupiterweb(listaCodigos) {
+function obterLoteDisciplinas(listaCodigos) {
   try {
     if (!listaCodigos || !Array.isArray(listaCodigos)) {
       return { sucesso: false, msg: 'Parâmetro listaCodigos deve ser uma lista de códigos.' };
     }
 
-    // Filtra e normaliza apenas códigos válidos de graduação (exclui pós-graduação e textos livres)
     const regexGrad = /^([A-Za-z]{3}0\d{3}|\d{7})$/;
+    const regexPos = /^[A-Za-z]{3}[1-9]\d{3}$/;
+
+    // Filtra e normaliza códigos válidos
     const codigosValidos = Array.from(new Set(
       listaCodigos
         .map(c => String(c).trim().toUpperCase())
-        .filter(c => regexGrad.test(c))
+        .filter(c => regexGrad.test(c) || regexPos.test(c))
     )).slice(0, 10); // Limite de segurança: máx 10 por lote
 
     if (codigosValidos.length === 0) {
@@ -1035,47 +1303,49 @@ function obterLoteJupiterweb(listaCodigos) {
 
     const cache = CacheService.getScriptCache();
     const PREFIXO_CACHE_JUPITER = 'JUP_V18_';
+    const PREFIXO_CACHE_JANUS = 'JAN_V2_';
     const resultado = {};
-    const pendentes = [];
+    const pendentesGrad = [];
+    const pendentesPos = [];
 
     // 1. Consulta o CacheService para cada código
     codigosValidos.forEach(cod => {
-      const cacheKey = PREFIXO_CACHE_JUPITER + cod;
+      const ehPos = regexPos.test(cod);
+      const cacheKey = (ehPos ? PREFIXO_CACHE_JANUS : PREFIXO_CACHE_JUPITER) + cod;
       const cached = cache.get(cacheKey);
       if (cached) {
         try {
           resultado[cod] = JSON.parse(cached);
         } catch (e) {
-          pendentes.push(cod);
+          if (ehPos) pendentesPos.push(cod);
+          else pendentesGrad.push(cod);
         }
       } else {
-        pendentes.push(cod);
+        if (ehPos) pendentesPos.push(cod);
+        else pendentesGrad.push(cod);
       }
     });
 
-    // 2. Se houver pendências, busca na web em lote paralelo com UrlFetchApp.fetchAll
-    if (pendentes.length > 0) {
-      const requisicoes = pendentes.map(cod => ({
+    // 2. Processa Pendências do Jupiterweb (Graduação - 1 Etapa)
+    if (pendentesGrad.length > 0) {
+      const requisicoesGrad = pendentesGrad.map(cod => ({
         url: 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=' + encodeURIComponent(cod),
         method: 'get',
         muteHttpExceptions: true
       }));
 
-      const respostas = UrlFetchApp.fetchAll(requisicoes);
+      const respostasGrad = UrlFetchApp.fetchAll(requisicoesGrad);
 
-      for (let i = 0; i < pendentes.length; i++) {
-        const cod = pendentes[i];
-        const resp = respostas[i];
+      for (let i = 0; i < pendentesGrad.length; i++) {
+        const cod = pendentesGrad[i];
+        const resp = respostasGrad[i];
         const cacheKey = PREFIXO_CACHE_JUPITER + cod;
 
         if (resp && resp.getResponseCode() === 200) {
-          // Decodificação obrigatória em ISO-8859-1 para preservar acentuação nativa do Júpiter
           const html = resp.getContentText('ISO-8859-1');
           const dadosParsed = parsearHtmlJupiterweb(cod, html);
-
           resultado[cod] = dadosParsed;
 
-          // Salva no CacheService (TTL de 6 horas / 21600s)
           try {
             const jsonStr = JSON.stringify(dadosParsed);
             if (jsonStr.length < 95000) {
@@ -1085,17 +1355,130 @@ function obterLoteJupiterweb(listaCodigos) {
             Logger.log('Aviso ao salvar no cache para ' + cod + ': ' + eCache.message);
           }
         } else {
-          // Erro de rede ou indisponibilidade temporária: gera registro e cache de 1 hora
-          const objErro = {
-            codigo: cod,
-            nome: '',
-            semOferecimento: true,
-            erro: true
-          };
+          const objErro = { codigo: cod, nome: '', semOferecimento: true, erro: true };
           resultado[cod] = objErro;
+          try { cache.put(cacheKey, JSON.stringify(objErro), 3600); } catch (e) {}
+        }
+      }
+    }
+
+    // 3. Processa Pendências do Janus (Pós-Graduação - 2 Etapas Diretas)
+    if (pendentesPos.length > 0) {
+      // 3.1. Etapa 1: Busca DisciplinaAux para extrair nome e oferecimentos
+      const requisicoesJanusEtapa1 = pendentesPos.map(cod => ({
+        url: 'https://uspdigital.usp.br/janus/DisciplinaAux?tipo=T&sgldis=' + encodeURIComponent(cod),
+        method: 'get',
+        muteHttpExceptions: true
+      }));
+
+      const respostasJanusEtapa1 = UrlFetchApp.fetchAll(requisicoesJanusEtapa1);
+      const oferecimentosParaBuscar = []; // { cod, ofe, nomeDisc }
+
+      for (let i = 0; i < pendentesPos.length; i++) {
+        const cod = pendentesPos[i];
+        const resp = respostasJanusEtapa1[i];
+        const cacheKey = PREFIXO_CACHE_JANUS + cod;
+
+        if (resp && resp.getResponseCode() === 200) {
+          let html = '';
           try {
-            cache.put(cacheKey, JSON.stringify(objErro), 3600);
-          } catch (e) {}
+            html = resp.getContentText('windows-1252');
+          } catch (eChar) {
+            html = resp.getContentText('ISO-8859-1');
+          }
+
+          const parsedDisc = parsearHtmlJanusDisciplina(cod, html);
+
+          if (parsedDisc.semOferecimento || !parsedDisc.oferecimentos || parsedDisc.oferecimentos.length === 0) {
+            const objSemOf = {
+              codigo: cod,
+              nome: parsedDisc.nome || '',
+              sistema: 'janus',
+              semOferecimento: true,
+              turmas: {}
+            };
+            resultado[cod] = objSemOf;
+            try { cache.put(cacheKey, JSON.stringify(objSemOf), 21600); } catch (e) {}
+          } else {
+            // Guarda para a Etapa 2
+            parsedDisc.oferecimentos.forEach(ofeNum => {
+              oferecimentosParaBuscar.push({
+                cod: cod,
+                ofe: ofeNum,
+                nomeDisc: parsedDisc.nome
+              });
+            });
+          }
+        } else {
+          const objErro = { codigo: cod, nome: '', sistema: 'janus', semOferecimento: true, erro: true, turmas: {} };
+          resultado[cod] = objErro;
+          try { cache.put(cacheKey, JSON.stringify(objErro), 3600); } catch (e) {}
+        }
+      }
+
+      // 3.2. Etapa 2: Bypass da casca JSF - busca direta em TurmaDet
+      if (oferecimentosParaBuscar.length > 0) {
+        const requisicoesJanusEtapa2 = oferecimentosParaBuscar.map(item => ({
+          url: 'https://uspdigital.usp.br/janus/TurmaDet?sgldis=' + encodeURIComponent(item.cod) + '&ofe=' + encodeURIComponent(item.ofe) + '&',
+          method: 'get',
+          muteHttpExceptions: true
+        }));
+
+        const respostasJanusEtapa2 = UrlFetchApp.fetchAll(requisicoesJanusEtapa2);
+        const turmasPorCodigo = {}; // { [cod]: { nome, turmasMap } }
+
+        for (let j = 0; j < oferecimentosParaBuscar.length; j++) {
+          const item = oferecimentosParaBuscar[j];
+          const resp = respostasJanusEtapa2[j];
+
+          if (!turmasPorCodigo[item.cod]) {
+            turmasPorCodigo[item.cod] = {
+              nome: item.nomeDisc,
+              turmasMap: {}
+            };
+          }
+
+          if (resp && resp.getResponseCode() === 200) {
+            let htmlTurma = '';
+            try {
+              htmlTurma = resp.getContentText('windows-1252');
+            } catch (eChar) {
+              htmlTurma = resp.getContentText('ISO-8859-1');
+            }
+
+            const parsedTurma = parsearHtmlJanusTurma(item.cod, htmlTurma, item.ofe);
+            if (parsedTurma) {
+              const chaveCanonica = parsedTurma.numero;
+              turmasPorCodigo[item.cod].turmasMap[chaveCanonica] = parsedTurma;
+            }
+          }
+        }
+
+        // Monta o objeto final de cada disciplina de pós e persiste no cache
+        for (const cod in turmasPorCodigo) {
+          const infoObj = turmasPorCodigo[cod];
+          const cacheKey = PREFIXO_CACHE_JANUS + cod;
+          const turmasMap = infoObj.turmasMap;
+          const temTurmas = Object.keys(turmasMap).length > 0;
+
+          const objJanus = {
+            codigo: cod,
+            nome: infoObj.nome || '',
+            sistema: 'janus',
+            semOferecimento: !temTurmas,
+            turmas: turmasMap
+          };
+
+          resultado[cod] = objJanus;
+
+          try {
+            const jsonStr = JSON.stringify(objJanus);
+            if (jsonStr.length < 95000) {
+              cache.put(cacheKey, jsonStr, 21600);
+            }
+          } catch (eCache) {
+            Logger.log('Aviso ao salvar cache Janus para ' + cod + ': ' + eCache.message);
+          }
         }
       }
     }
@@ -1103,9 +1486,17 @@ function obterLoteJupiterweb(listaCodigos) {
     return { sucesso: true, dados: resultado };
 
   } catch (err) {
-    Logger.log('Erro em obterLoteJupiterweb: ' + err.stack);
-    return { sucesso: false, msg: 'Erro ao consultar turmas no Jupiterweb: ' + err.message };
+    Logger.log('Erro em obterLoteDisciplinas: ' + err.stack);
+    return { sucesso: false, msg: 'Erro ao consultar turmas: ' + err.message };
   }
+}
+
+/**
+ * Alias de retrocompatibilidade para o endpoint legada do Jupiterweb.
+ * Redireciona para o despachante unificado obterLoteDisciplinas.
+ */
+function obterLoteJupiterweb(listaCodigos) {
+  return obterLoteDisciplinas(listaCodigos);
 }
 
 // ============================================================================
