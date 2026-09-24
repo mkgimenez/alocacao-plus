@@ -21,6 +21,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0011](0011-sincronizador-automatico-python-gas-api.md) | Sincronizador Automático em Python via Apps Script REST API | **Aceito** | 2026-09-22 |
 | [0012](0012-controle-de-versao-semver-build.md) | Controle de Versão Semântico (SemVer) e Contador de Build Automático | **Aceito** | 2026-09-22 |
 | [0013](0013-enriquecimento-progressivo-jupiterweb.md) | Enriquecimento Progressivo de Disciplinas com Dados do Jupiterweb | **Aceito** | 2026-09-23 |
+| [0014](0014-padronizacao-botoes-e-micro-animacoes-tateis.md) | Padronização Visual de Botões e Micro-Animações Táteis ("Efeitos Fofinhos") | **Aceito** | 2026-09-24 |
 
 ---
 

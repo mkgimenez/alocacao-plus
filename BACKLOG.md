@@ -1,3 +1,21 @@
+## 📥 Inbox (Captura Rápida)
+
+
+- [ ] A caixa de busca "Busca disciplina, docente ou texto..." deve permitir filtrar células por:
+    - Sigla da disciplina;
+    - Nome da disciplina;
+    - Turma da disciplina, com regex resiliente, por exemplo T01, t01 T1, t1, T-01, t-1;
+    - Nome do docente, inclusive quando houver mais que um docente;
+    - Modalidade Teórica ou Prática
+    - Período Semestral ou Anual
+    - Qualquer palavra do campo observações
+    
+- [ ] Atualizar para o Janus
+    Todas as funcionalidades que foram criadas para as células de Graduação, devem ser replicadas para as células das diciplinas de pós-graduação. A diferença aqui é que depois de fazer o parser da página da disciplina do Janus, será necessário buscar uma URL no formato "https://uspdigital.usp.br/janus/publico/turma/<SIGLA DA DISCIPLINA>/<ALGUM DÍGITO>", acessar essa url e fazer um novo parser para, daí sim conseguir os dados da disciplina.
+
+---
+
+
 # 📋 Backlog & Banco de Ideias — Alocação Plus
 
 > **Espaço ágil para captura e evolução de ideias, melhorias e tarefas pendentes.**  
@@ -22,16 +40,6 @@ flowchart LR
 
 > 💡 **Dica de Terminal:** Você também pode anotar ideias direto pelo terminal sem abrir o arquivo:  
 > `python tools/gas_sync.py idea "Sua ideia aqui em uma frase"`
-
----
-
-## 📥 Inbox (Captura Rápida)
-<!--
-Escreva aqui novas ideias de forma direta e sem fricção (uma sentença por linha).
-Exemplo: - [ ] Salvar filtros favoritos no navegador
--->
-
-*(Nenhuma ideia pendente na Inbox)*
 
 ---
 
@@ -73,6 +81,12 @@ Exemplo: - [ ] Salvar filtros favoritos no navegador
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.2.1:** Padronização Visual e Micro-Animações Táteis ("Efeitos Fofinhos") nos Botões do Card Flutuante:
+  - Eliminação da inconsistência de altura física (2px) entre o botão Fechar e os botões outline no rodapé;
+  - Transições em curva de mola `cubic-bezier(0.34, 1.56, 0.64, 1)` com elevação no hover (`translateY(-1px)`) e contração física no clique (`scale(0.96)` / `scale(0.95)` em 0.05s) para todos os botões (turmas inativas e ativas, abrir no Jupiterweb, filtrar grade e fechar);
+  - Agrupamento harmonioso no rodapé (link informativo à esquerda e ações operacionais à direita);
+  - Criação do ADR 0014 e do guia de Design System `docs/padroes-interface-botoes.md` para governança futura;
+  - Suporte completo a `@media (prefers-reduced-motion: reduce)`.
 - [x] **v1.2.0:** Telemetria e Contador de Acessos Nativo no Google Sheets:
   - Registro silencioso e assíncrono em segundo plano (0ms de impacto no carregamento e renderização da grade);
   - Identificador anônimo aleatório no `localStorage` para cálculo de visitantes únicos e frequência diária (LGPD-compliant);
