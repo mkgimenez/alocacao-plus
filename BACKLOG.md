@@ -69,6 +69,17 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.5.1:** Chips da Busca Baseados Exclusivamente na Grade Atual & Resiliência do Estado Vazio:
+  - Eliminação completa de listas semente estáticas (`DOCENTES_SEMENTE` e `DISCIPLINAS_SEMENTE`); índices de busca são derivados 100% da grade alocada no momento;
+  - Extração canônica e unificada de turmas (`extrairTurmasNumericasDaCelula`) compartilhada entre indexação e filtragem de busca (DRY);
+  - Varredura em passo único $O(1)$ da grade compilando disciplinas ativas, turmas ativas e frequências departamentais reais;
+  - Filtragem estrita de docentes por turma alocada com fallback seguro para ocorrências sem turma (`temSemTurma`), eliminando chips fantasmas e ocorrências de "0 salas encontradas";
+  - Suporte completo a departamentos puramente numéricos do IFSC (código `7600006` mapeado para `760`) e oferecimentos do Janus (`t.ofe`);
+  - Ordenação dinâmica dos departamentos frequentes no estado vazio por volume real de aulas alocadas no semestre;
+  - Resiliência no estado vazio: orientação contextual ao usuário quando a busca não retorna salas enquanto o carregamento em lote do Júpiterweb/Janus ainda está em execução;
+  - Correção de contraste e acessibilidade no botão "Ver Todas as Salas" (`.btn-primary-outline` com cor `#104880` legível sobre fundo claro);
+  - Formalização arquitetural no ADR 0018;
+  - Expansão da suíte de testes de 72 para 83 testes automatizados (100% de sucesso).
 - [x] **v1.5.0:** Coloração Progressiva da Grade, Priorização Geométrica no Viewport 2D & Consolidação do Card Modal:
   - Células da grade iniciam com cores neutras (`.celula-aula-pendente`), transitando suavemente (`transition: 0.4s`) para as tonalidades oficiais (azul céu para graduação e azul cobalto para pós) conforme cada lote é concluído pelo worker em segundo plano;
   - Micro-animação tátil (`celula-recem-carregada`) que sinaliza discretamente a prontidão do card modal;

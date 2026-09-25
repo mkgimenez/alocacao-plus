@@ -24,7 +24,7 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
   - **Blocos e Salas:** Reconhecimento automático dos blocos didáticos (`Bloco A`, `Bloco C`, `Laranja`, `Anfiteatros`, etc.).
   - **Capacidade Mínima:** Filtros numéricos e atalhos rápidos (`30+`, `50+`, `80+` lugares).
   - **🚪 Modo Salas Livres:** Identifica instantaneamente quais salas estão desocupadas no intervalo selecionado.
-- **🔍 Busca Inteligente & Autocomplete:** Pesquisa multicritério por código de disciplina, nome de docente, modalidade, local de aula ou termos livres, com popover de autocomplete para departamentos da EESC/USP, disciplinas troncais e docentes.
+- **🔍 Busca Inteligente & Autocomplete Fiel à Grade:** Pesquisa multicritério por código de disciplina, nome de docente, modalidade, local de aula ou termos livres, com popover de autocomplete cujos chips (departamentos, disciplinas e docentes) são derivados **100% da grade alocada no momento** (eliminando chips fantasmas e resultados vazios), departamentos ativos ordenados por volume real de aulas no semestre e feedback contextual durante o enriquecimento assíncrono.
 - **🎨 Coloração Progressiva da Grade:** Células iniciam com estilo neutro e suave (`.celula-aula-pendente`), transitando para as cores oficiais (azul céu para graduação e azul cobalto para pós-graduação) conforme os lotes são carregados ao vivo em segundo plano.
 - **📐 Fila Inteligente com Viewport 2D:** O worker em segundo plano prioriza estritamente as células visíveis na tela (interseção 2D de salas e horários visíveis) em ordem natural de leitura, com reordenação dinâmica na rolagem da grade (debounce de 150ms) e promoção imediata (Prioridade 0) com card *skeleton* no clique.
 - **🔗 Integração e Enriquecimento com Portais Acadêmicos da USP:**
@@ -69,7 +69,7 @@ alocacao-plus/
 │   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
 │   ├── test_cell_coloring_logic.py # Validação de coloração progressiva e classes CSS
 │   ├── test_queue_logic.py        # Fila 2D de viewport, reordenação em scroll e concorrência
-│   ├── test_autocomplete_logic.py # Popover de autocomplete e busca semântica
+│   ├── test_autocomplete_logic.py # Autocomplete exclusivo da grade e busca semântica (83 testes)
 │   ├── test_search_filter.py      # Busca multicritério resiliente
 │   ├── test_jupiter_parser.py     # Parser HTML do Jupiterweb e fuzzing sintético
 │   ├── test_janus_parser.py       # Parser HTML do Janus (Pós-Graduação) e TurmaDet

@@ -231,9 +231,9 @@
       // Renderiza a grade completa
       renderizarGrade();
 
-      // Indexa disciplinas presentes na grade recém-carregada
-      if (typeof inicializarIndiceDisciplinas === 'function') {
-        inicializarIndiceDisciplinas();
+      // Reindexa a busca exclusivamente a partir da grade recém-carregada e do cache local
+      if (typeof reindexarBuscaDaGradeAtual === 'function') {
+        reindexarBuscaDaGradeAtual();
       }
 
       // Se foi uma solicitação manual, exibe a notificação Toast de sucesso
@@ -873,6 +873,50 @@
   }
 
   /**
+   * Extrai números inteiros de turma a partir do objeto da célula da grade.
+   * Analisa cel.turmas (se presente) e faz fallback resiliente sobre cel.t (T01, Turma 1, T1/T2, pós SEP5864 - 1).
+   * Armazena em cache na própria célula (cel._turmasNums) para consultas subsequentes O(1).
+   */
+  function extrairTurmasNumericasDaCelula(cel) {
+    if (!cel) return [];
+    if (cel._turmasNums && Array.isArray(cel._turmasNums)) {
+      return cel._turmasNums;
+    }
+    const nums = [];
+    if (cel.turmas && Array.isArray(cel.turmas)) {
+      cel.turmas.forEach(t => {
+        const n = parseInt(t, 10);
+        if (!isNaN(n) && !nums.includes(n)) nums.push(n);
+      });
+    }
+    if (nums.length === 0 && cel.t) {
+      const reT = /(?:-\s*|\/\s*)?(?:T\s*[\-_]?\s*|Turma\s+)(\d{1,2})/gi;
+      let mT;
+      while ((mT = reT.exec(cel.t)) !== null) {
+        const n = parseInt(mT[1], 10);
+        if (!isNaN(n) && !nums.includes(n)) nums.push(n);
+      }
+      if (nums.length === 0) {
+        const reNum = /(?:-\s*|\/\s*)(\d{1,2})(?:\s*(?:e|E|\/)\s*(\d{1,2}))?(?:\s*$|\s+(?:pv|tv|pós|pos|\/))/gi;
+        let mN;
+        while ((mN = reNum.exec(cel.t)) !== null) {
+          if (mN[1]) {
+            const n1 = parseInt(mN[1], 10);
+            if (!isNaN(n1) && !nums.includes(n1)) nums.push(n1);
+          }
+          if (mN[2]) {
+            const n2 = parseInt(mN[2], 10);
+            if (!isNaN(n2) && !nums.includes(n2)) nums.push(n2);
+          }
+        }
+      }
+    }
+    cel._turmasNums = nums;
+    cel._temTurma = nums.length > 0;
+    return nums;
+  }
+
+  /**
    * Verifica se uma célula atende a todos os tokens da busca textual,
    * considerando sigla, nome da disciplina, turma com regex resiliente,
    * docentes (inclusive múltiplos/co-docência), modalidade (direto do card: Teórica/Prática),
@@ -884,31 +928,7 @@
     // Inicializa metadados estáticos da célula em cache de execução
     if (!cel._metaBusca) {
       cel._tNorm = normalizarTexto(cel.t || '');
-      const nums = [];
-      if (cel.turmas && Array.isArray(cel.turmas)) {
-        cel.turmas.forEach(t => {
-          const n = parseInt(t, 10);
-          if (!isNaN(n) && !nums.includes(n)) nums.push(n);
-        });
-      }
-      if (nums.length === 0 && cel.t) {
-        const reT = /(?:-\s*)?T\s*[\-_]?\s*(\d{1,2})/gi;
-        let mT;
-        while ((mT = reT.exec(cel.t)) !== null) {
-          const n = parseInt(mT[1], 10);
-          if (!isNaN(n) && !nums.includes(n)) nums.push(n);
-        }
-        if (nums.length === 0) {
-          const rePos = /\b[A-Za-z]{3}5\d{3}\s*-\s*(\d{1,2})\b/gi;
-          let mPos;
-          while ((mPos = rePos.exec(cel.t)) !== null) {
-            const n = parseInt(mPos[1], 10);
-            if (!isNaN(n) && !nums.includes(n)) nums.push(n);
-          }
-        }
-      }
-      cel._turmasNums = nums;
-      cel._temTurma = nums.length > 0;
+      extrairTurmasNumericasDaCelula(cel);
       cel._temTv = /\btv\b/i.test(cel.t || '') || /teoric/i.test(cel.t || '');
       cel._temPv = /\bpv\b/i.test(cel.t || '') || /pratic/i.test(cel.t || '');
       cel._codsNorm = (cel.d || []).map(c => normalizarTexto(c));
@@ -1276,119 +1296,9 @@
     { sigla: 'IAU', nome: 'Arquitetura e Urbanismo', apelido: 'Arquitetura', unidade: 'IAU', keywords: ['arquitetura', 'urbanismo', 'desenho', 'projeto', 'paisagismo', 'historia arquitetura'] }
   ];
 
-  const DOCENTES_SEMENTE = [
-    { nome: 'Carlos Alberto Fortulan', depto: 'SEM' },
-    { nome: 'Marcelo Becker', depto: 'SEM' },
-    { nome: 'Glauco Augusto de Paula Caurin', depto: 'SEM' },
-    { nome: 'Paulo Seleghim Junior', depto: 'SEM' },
-    { nome: 'Fernando Martini Catalano', depto: 'SEM/SAA' },
-    { nome: 'Zilda de Castro Silveira', depto: 'SEM' },
-    { nome: 'Adriano Almeida Gonçalves Siqueira', depto: 'SEM' },
-    { nome: 'Carlos De Marqui Junior', depto: 'SAA/SEM' },
-    { nome: 'Daniel Varela Magalhães', depto: 'SEM' },
-    { nome: 'Álvaro Manoel de Souza Soares', depto: 'SEM' },
-
-    { nome: 'Carlos Dias Maciel', depto: 'SEL' },
-    { nome: 'Denis Vinicius Coury', depto: 'SEL' },
-    { nome: 'Mario Oleskovicz', depto: 'SEL' },
-    { nome: 'Marcelo Andrade da Costa Vieira', depto: 'SEL' },
-    { nome: 'Eduardo Nobuhiro Asada', depto: 'SEL' },
-    { nome: 'João Paulo do Carmo', depto: 'SEL' },
-    { nome: 'Luís Fernando Costa Alberto', depto: 'SEL' },
-    { nome: 'Mário Alexandre Gazziro', depto: 'SEL' },
-    { nome: 'Sebastião E. Neto da Silva', depto: 'SEL' },
-
-    { nome: 'Sérgio Persival Baroncini Proença', depto: 'SET' },
-    { nome: 'Vladimir Guilherme Haach', depto: 'SET' },
-    { nome: 'Maximiliano dos Santos Anversa', depto: 'SET' },
-    { nome: 'José Samuel Giongo', depto: 'SET' },
-    { nome: 'Jorge Munaiar Neto', depto: 'SET' },
-    { nome: 'Luciana Maria Bonvino Figueiredo', depto: 'SET' },
-    { nome: 'Rodrigo Ribeiro Paccola', depto: 'SET' },
-
-    { nome: 'Aldo Roberto Ometto', depto: 'SEP' },
-    { nome: 'Daisy Aparecida do Carmo Curtolo', depto: 'SEP' },
-    { nome: 'Daniel Capaldo Amaral', depto: 'SEP' },
-    { nome: 'Mateus Cecilio Gerolamo', depto: 'SEP' },
-    { nome: 'Janaina Mascarenhas Hornos da Costa', depto: 'SEP' },
-    { nome: 'Edisio Alves de Aguiar Junior', depto: 'SEP' },
-
-    { nome: 'Carlos Alberto Della Rovere', depto: 'SMM' },
-    { nome: 'Haroldo Cavalcanti Pinto', depto: 'SMM' },
-    { nome: 'Antonio Jorge Abdalla', depto: 'SMM' },
-    { nome: 'Edson Antonio Ticianelli', depto: 'IQSC/SMM' },
-
-    { nome: 'Edson Cezar Wendland', depto: 'SHS' },
-    { nome: 'Maria do Carmo Calijuri', depto: 'SHS' },
-    { nome: 'Rodrigo de Melo Porto', depto: 'SHS' },
-    { nome: 'Lyda Patricia Sabogal Paz', depto: 'SHS' },
-
-    { nome: 'Lázaro Valentin Zuquette', depto: 'SGS' },
-    { nome: 'Tacio Mauro Pereira de Campos', depto: 'SGS' },
-    { nome: 'Maria Eugenia Gimenez Boscov', depto: 'SGS' },
-
-    { nome: 'Alvaro Martins Abdalla', depto: 'SAA' },
-    { nome: 'Hernan Dario Ceron Muñoz', depto: 'SAA' },
-    { nome: 'James Waterhouse', depto: 'SAA' },
-
-    { nome: 'Cira Souza Pitombo', depto: 'STT' },
-    { nome: 'José Leomar Fernandes Júnior', depto: 'STT' },
-    { nome: 'Antônio Nélson Rodrigues da Silva', depto: 'STT' },
-    { nome: 'Ana Paula Camargo Larocca', depto: 'STT' },
-
-    { nome: 'Daniel Smania', depto: 'SMA' },
-    { nome: 'Hildebrando Munhoz Rodrigues', depto: 'SMA' },
-    { nome: 'Alexandre Nolasco de Carvalho', depto: 'SMA' },
-    { nome: 'Ana Claudia Nabarro', depto: 'SMA' },
-    { nome: 'Tiago Picon', depto: 'SMA' },
-    { nome: 'Reginaldo Demarque', depto: 'SMA' },
-
-    { nome: 'Francisco Louzada Neto', depto: 'SME' },
-    { nome: 'Cynthia de Oliveira Lage Ferreira', depto: 'SME' },
-    { nome: 'Juliana Cobre', depto: 'SME' },
-    { nome: 'José Alberto Cuminato', depto: 'SME' },
-
-    { nome: 'Vanderlei Salvador Bagnato', depto: 'IFSC' },
-    { nome: 'Tito José Bonagamba', depto: 'IFSC' },
-    { nome: 'Yvonne Primerano Mascarenhas', depto: 'IFSC' },
-    { nome: 'Luiz Vitor de Souza Filho', depto: 'IFSC' },
-    { nome: 'Euclydes Marega Junior', depto: 'IFSC' }
-  ];
-
   const mapaDocentesIndexados = new Map();
   const mapaDisciplinasIndexadas = new Map();
   let indiceSugestaoTeclado = -1;
-
-  const DISCIPLINAS_SEMENTE = [
-    { codigo: 'SMA0301', nome: 'Cálculo I' },
-    { codigo: 'SMA0354', nome: 'Cálculo II' },
-    { codigo: 'SMA0355', nome: 'Cálculo III' },
-    { codigo: 'SMA0356', nome: 'Cálculo IV' },
-    { codigo: 'SMA0300', nome: 'Geometria Analítica' },
-    { codigo: 'SMA0305', nome: 'Álgebra Linear' },
-    { codigo: 'SME0340', nome: 'Cálculo Numérico' },
-    { codigo: 'SME0300', nome: 'Estatística e Probabilidade' },
-    { codigo: '7600005', nome: 'Física I' },
-    { codigo: '7600006', nome: 'Física II' },
-    { codigo: '7600007', nome: 'Física III' },
-    { codigo: '7600008', nome: 'Física IV' },
-    { codigo: 'SQM0400', nome: 'Química Geral' },
-    { codigo: 'SET0188', nome: 'Resistência dos Materiais I' },
-    { codigo: 'SET0198', nome: 'Resistência dos Materiais II' },
-    { codigo: 'SET0403', nome: 'Mecânica das Estruturas I' },
-    { codigo: 'SEM0500', nome: 'Mecânica Geral I' },
-    { codigo: 'SEM0501', nome: 'Mecanismos' },
-    { codigo: 'SEM0538', nome: 'Mecânica dos Sólidos' },
-    { codigo: 'SEM0533', nome: 'Termodinâmica Aplicada' },
-    { codigo: 'SHS0360', nome: 'Mecânica dos Fluidos' },
-    { codigo: 'SEL0353', nome: 'Circuitos Elétricos I' },
-    { codigo: 'SEL0414', nome: 'Eletromagnetismo' },
-    { codigo: 'SEP0142', nome: 'Introdução à Engenharia de Produção' },
-    { codigo: 'SMM0193', nome: 'Ciência dos Materiais' },
-    { codigo: 'SAA0100', nome: 'Introdução à Engenharia Aeronáutica' },
-    { codigo: 'STT0410', nome: 'Engenharia de Transportes' },
-    { codigo: 'SSC0108', nome: 'Introdução à Ciência da Computação' }
-  ];
 
   function normalizarNomeDocente(nomeRaw) {
     if (!nomeRaw) return '';
@@ -1439,57 +1349,154 @@
     }
   }
 
-  function inicializarIndiceDocentes() {
-    DOCENTES_SEMENTE.forEach(d => {
-      indexarDocente(d.nome, d.depto, null);
+  /**
+   * Varre a matriz da grade ativa e compila:
+   * 1. Mapa de disciplinas presentes: código -> { turmas: Set(nums), temSemTurma: boolean }
+   * 2. Frequência de aulas por sigla departamental ativa (ex: 'SEM' -> 42, '760' -> 18)
+   */
+  function extrairDisciplinasETurmasDaGrade() {
+    const mapa = new Map();
+    const freqDeptos = new Map();
+
+    if (!estadoApp.dadosBrutos || !Array.isArray(estadoApp.dadosBrutos.grade)) {
+      return { disciplinas: mapa, departamentosAtivos: freqDeptos };
+    }
+
+    estadoApp.dadosBrutos.grade.forEach(linha => {
+      if (!Array.isArray(linha)) return;
+      linha.forEach(cel => {
+        if (!cel || !cel.d || !Array.isArray(cel.d) || cel.d.length === 0) return;
+        const turmasNums = extrairTurmasNumericasDaCelula(cel);
+
+        // Deduplica departamentos na mesma célula para contagem fiel de frequência de aulas
+        const deptosVistosNaCelula = new Set();
+
+        cel.d.forEach(codRaw => {
+          const cod = String(codRaw).trim().toUpperCase();
+          if (!cod) return;
+
+          // Extrai sigla departamental: 3 letras (SEM, SMA) ou 3 primeiros dígitos para IFSC (760)
+          let siglaDepto = '';
+          const mLetras = /^[A-Za-z]{3}/.exec(cod);
+          if (mLetras) {
+            siglaDepto = mLetras[0].toUpperCase();
+          } else {
+            const mNum = /^(\d{3})\d{4}$/.exec(cod);
+            if (mNum) siglaDepto = mNum[1];
+          }
+
+          if (siglaDepto) {
+            deptosVistosNaCelula.add(siglaDepto);
+          }
+
+          if (!mapa.has(cod)) {
+            mapa.set(cod, { temSemTurma: false, turmas: new Set() });
+          }
+          const info = mapa.get(cod);
+          if (turmasNums.length > 0) {
+            turmasNums.forEach(t => info.turmas.add(t));
+          } else {
+            info.temSemTurma = true;
+          }
+        });
+
+        deptosVistosNaCelula.forEach(sigla => {
+          freqDeptos.set(sigla, (freqDeptos.get(sigla) || 0) + 1);
+        });
+      });
     });
 
-    if (estadoApp.cacheJupiter) {
-      Object.keys(estadoApp.cacheJupiter).forEach(cod => {
-        indexarDocentesDeDadosDisciplina(cod, estadoApp.cacheJupiter[cod]);
-      });
-    }
+    return { disciplinas: mapa, departamentosAtivos: freqDeptos };
   }
 
-  function inicializarIndiceDisciplinas() {
-    DISCIPLINAS_SEMENTE.forEach(d => {
-      indexarDisciplina(d.codigo, d.nome);
+  /**
+   * Reconstrói os índices de busca a partir exclusivamente da grade ativa
+   * e dos dados em cache do Júpiterweb e Janus.
+   */
+  function reindexarBuscaDaGradeAtual() {
+    mapaDocentesIndexados.clear();
+    mapaDisciplinasIndexadas.clear();
+
+    const { disciplinas, departamentosAtivos } = extrairDisciplinasETurmasDaGrade();
+    estadoApp._mapaGradeDisciplinas = disciplinas;
+    estadoApp._departamentosAtivosGrade = departamentosAtivos;
+
+    // 1. Indexa códigos das disciplinas encontradas na grade
+    disciplinas.forEach((info, cod) => {
+      indexarDisciplina(cod, null);
     });
 
+    // 2. Se houver dados em cache (Júpiterweb e Janus), enriquece nomes e docentes alocados
     if (estadoApp.cacheJupiter) {
-      Object.keys(estadoApp.cacheJupiter).forEach(cod => {
-        const item = estadoApp.cacheJupiter[cod];
-        if (item && item.nome) {
-          indexarDisciplina(cod, item.nome);
+      disciplinas.forEach((info, cod) => {
+        const dados = estadoApp.cacheJupiter[cod];
+        if (dados) {
+          if (dados.nome) indexarDisciplina(cod, dados.nome);
+          indexarDocentesDeDadosDisciplina(cod, dados);
         }
       });
     }
 
-    if (estadoApp.dadosBrutos && Array.isArray(estadoApp.dadosBrutos.grade)) {
-      estadoApp.dadosBrutos.grade.forEach(linha => {
-        if (!Array.isArray(linha)) return;
-        linha.forEach(cel => {
-          if (cel && cel.d && Array.isArray(cel.d)) {
-            cel.d.forEach(c => indexarDisciplina(c, null));
-          }
-        });
-      });
+    // 3. Re-renderiza o dropdown se o usuário estiver com foco no campo de busca
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca && document.activeElement === inpBusca && typeof atualizarSugestoesBusca === 'function') {
+      atualizarSugestoesBusca(inpBusca.value);
     }
   }
 
+  // Aliases de compatibilidade
+  function inicializarIndiceDocentes() {
+    reindexarBuscaDaGradeAtual();
+  }
+  function inicializarIndiceDisciplinas() {
+    reindexarBuscaDaGradeAtual();
+  }
+
+  /**
+   * Indexa docentes de um objeto retornado pelo Júpiterweb ou Janus,
+   * restringindo aos docentes das turmas efetivamente alocadas na grade.
+   */
   function indexarDocentesDeDadosDisciplina(codigo, dados) {
     if (!dados || !dados.turmas) return;
-    const depto = /^[A-Za-z]{3}/.test(codigo) ? codigo.substring(0, 3).toUpperCase() : '';
+    const codLimpo = String(codigo || '').trim().toUpperCase();
+    const infoGrade = estadoApp._mapaGradeDisciplinas ? estadoApp._mapaGradeDisciplinas.get(codLimpo) : null;
+
+    // Descarta se a disciplina não pertencer à grade ativa
+    if (!infoGrade) return;
+
+    // Sigla departamental (suporta 3 letras ou 3 dígitos do IFSC como 760)
+    let depto = '';
+    const mLetras = /^[A-Za-z]{3}/.exec(codLimpo);
+    if (mLetras) {
+      depto = mLetras[0].toUpperCase();
+    } else {
+      const mNum = /^(\d{3})\d{4}$/.exec(codLimpo);
+      if (mNum) depto = mNum[1];
+    }
+
+    // Só restringe a turmas específicas se houver turmas cadastradas E NENHUMA aula sem turma indicada
+    const temTurmasRestritas = (infoGrade.turmas.size > 0 && !infoGrade.temSemTurma);
+    const turmasPermitidas = infoGrade.turmas;
+
     const turmasObjs = Object.values(dados.turmas);
     turmasObjs.forEach(t => {
+      if (temTurmasRestritas) {
+        const numT = parseInt(t.numero || t.ofe, 10);
+        let casaTurma = !isNaN(numT) && turmasPermitidas.has(numT);
+        if (!casaTurma && t.codigoTurma) {
+          casaTurma = Array.from(turmasPermitidas).some(n => t.codigoTurma.endsWith(String(n).padStart(2, '0')));
+        }
+        if (!casaTurma) return;
+      }
+
       if (t.docentes && Array.isArray(t.docentes)) {
-        t.docentes.forEach(d => indexarDocente(d, depto, codigo));
+        t.docentes.forEach(d => indexarDocente(d, depto, codLimpo));
       }
       if (t.horarios && Array.isArray(t.horarios)) {
         t.horarios.forEach(h => {
-          if (h.docente) indexarDocente(h.docente, depto, codigo);
+          if (h.docente) indexarDocente(h.docente, depto, codLimpo);
           if (h.professores && Array.isArray(h.professores)) {
-            h.professores.forEach(p => indexarDocente(p, depto, codigo));
+            h.professores.forEach(p => indexarDocente(p, depto, codLimpo));
           }
         });
       }
@@ -1498,11 +1505,27 @@
 
   function buscarSugestoes(termo) {
     const termoStr = String(termo || '').trim();
+    const gradeCarregando = !estadoApp.dadosBrutos || !estadoApp._departamentosAtivosGrade;
+    const deptosAtivosMap = estadoApp._departamentosAtivosGrade || new Map();
+
     if (!termoStr) {
+      let departamentosSugeridos = [];
+      if (!gradeCarregando) {
+        departamentosSugeridos = CATALOGO_DEPARTAMENTOS
+          .filter(dep => deptosAtivosMap.has(dep.sigla))
+          .sort((a, b) => {
+            const freqDiff = (deptosAtivosMap.get(b.sigla) || 0) - (deptosAtivosMap.get(a.sigla) || 0);
+            if (freqDiff !== 0) return freqDiff;
+            return a.sigla.localeCompare(b.sigla);
+          })
+          .slice(0, 8);
+      }
+
       return {
         termo: '',
         ehVazio: true,
-        departamentos: CATALOGO_DEPARTAMENTOS.slice(0, 6),
+        gradeCarregando: gradeCarregando,
+        departamentos: departamentosSugeridos,
         disciplinas: [],
         docentes: [],
         acoesRapidas: [
@@ -1515,9 +1538,11 @@
 
     const tNorm = normalizarTexto(termoStr);
 
-    // 1. Departamentos
+    // 1. Departamentos (Restrito ESTRITAMENTE aos departamentos com aulas na grade ativa)
     const deptosEncontrados = [];
     CATALOGO_DEPARTAMENTOS.forEach(dep => {
+      if (!deptosAtivosMap.has(dep.sigla)) return;
+
       const sNorm = normalizarTexto(dep.sigla);
       const nNorm = normalizarTexto(dep.nome);
       const aNorm = normalizarTexto(dep.apelido);
@@ -1605,6 +1630,7 @@
     return {
       termo: termoStr,
       ehVazio: false,
+      gradeCarregando: false,
       departamentos: deptosEncontrados.slice(0, 6),
       disciplinas: disciplinasEncontradas.slice(0, 5),
       docentes: docentesEncontrados.slice(0, 6),
@@ -1622,7 +1648,7 @@
     const temDocs = res.docentes.length > 0;
     const temAcoes = (res.acoesRapidas && res.acoesRapidas.length > 0);
 
-    if (!temDeptos && !temDisciplinas && !temDocs && !temAcoes) {
+    if (!temDeptos && !temDisciplinas && !temDocs && !temAcoes && !res.gradeCarregando) {
       fecharSugestoesBusca();
       return;
     }
@@ -1646,7 +1672,18 @@
       `;
     }
 
-    if (temDeptos) {
+    if (res.gradeCarregando && res.ehVazio) {
+      html += `
+        <div class="sugestoes-secao">
+          <div class="sugestoes-secao-header">
+            <span class="sugestoes-secao-titulo"><span>⏳</span> Carregando Grade...</span>
+          </div>
+          <div style="padding: 8px 12px; font-size: 12px; color: var(--cor-texto-mutado, #888);">
+            Sincronizando departamentos e disciplinas ativas...
+          </div>
+        </div>
+      `;
+    } else if (temDeptos) {
       const tituloSecao = res.ehVazio ? 'Departamentos Frequentes' : 'Departamentos';
       html += `
         <div class="sugestoes-secao">
@@ -1759,8 +1796,9 @@
   }
 
   function configurarAutocompleteBusca() {
-    inicializarIndiceDocentes();
-    inicializarIndiceDisciplinas();
+    if (typeof reindexarBuscaDaGradeAtual === 'function') {
+      reindexarBuscaDaGradeAtual();
+    }
 
     const inpBusca = document.getElementById('input-busca-sala');
     const popover = document.getElementById('busca-sugestoes-dropdown');
@@ -2040,8 +2078,15 @@
           containerVazio.querySelector('h3').textContent = 'Nenhum horário selecionado';
           containerVazio.querySelector('p').textContent = 'Selecione ao menos um dia da semana ou amplie a faixa de horários.';
         } else if (temBusca) {
+          const emCarregamentoJupiter = Boolean(
+            (estadoApp.filaJupiter && estadoApp.filaJupiter.length > 0) || estadoApp.jupiterRequisicaoEmVoo
+          );
           containerVazio.querySelector('h3').textContent = `Nenhuma sala encontrada para "${escapeHtml(buscaLimpa)}"`;
-          containerVazio.querySelector('p').textContent = 'Tente buscar por outra sigla, docente ou relaxar os filtros superiores de dia, bloco ou horário.';
+          if (emCarregamentoJupiter) {
+            containerVazio.querySelector('p').innerHTML = 'O sistema ainda está carregando as informações de turmas e docentes em segundo plano.<br>Por favor, <strong>aguarde a conclusão do carregamento e tente novamente</strong>.';
+          } else {
+            containerVazio.querySelector('p').textContent = 'Tente buscar por outra sigla, docente ou relaxar os filtros superiores de dia, bloco ou horário.';
+          }
         } else {
           containerVazio.querySelector('h3').textContent = 'Nenhuma sala encontrada com os filtros atuais';
           containerVazio.querySelector('p').textContent = 'Tente relaxar os filtros de bloco, capacidade ou desmarcar "Apenas Salas Livres".';
@@ -2450,6 +2495,9 @@
       chavesParaRemover.forEach(k => sessionStorage.removeItem(k));
     } catch (e) {
       console.warn('Erro ao limpar sessionStorage:', e);
+    }
+    if (typeof reindexarBuscaDaGradeAtual === 'function') {
+      reindexarBuscaDaGradeAtual();
     }
     atualizarProgressoCarregamentoDinamico();
   }

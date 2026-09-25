@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Suíte de Testes Automatizados — Autocomplete Inteligente no Campo de Busca
-Valida o catálogo de departamentos, indexação de docentes e motor de sugestões
+Valida o catálogo de departamentos, extração canônica de turmas,
+indexação estrita baseada exclusivamente na grade atual e motor de sugestões
 espelhando a lógica implementada em JavaScript (src/scripts.html).
 """
 
@@ -28,6 +29,106 @@ def normalizar_nome_docente(nome_raw):
     limpo = re.sub(r'^(?:(?:Prof(?:a)?|Dr(?:a)?|Ms|Msc)\.?\s*)+', '', limpo, flags=re.IGNORECASE)
     limpo = re.sub(r'\s+', ' ', limpo).strip()
     return limpo
+
+
+def extrair_turmas_numericas_da_celula(cel):
+    """
+    Espelho Python fiel de extrairTurmasNumericasDaCelula (src/scripts.html).
+    Extrai números inteiros de turma de cel['turmas'] ou com regex resiliente em cel['t'].
+    """
+    if not cel:
+        return []
+    if "_turmasNums" in cel and isinstance(cel["_turmasNums"], list):
+        return cel["_turmasNums"]
+
+    nums = []
+    if cel.get("turmas") and isinstance(cel["turmas"], list):
+        for t in cel["turmas"]:
+            try:
+                n = int(t)
+                if n not in nums:
+                    nums.append(n)
+            except (ValueError, TypeError):
+                pass
+
+    if not nums and cel.get("t"):
+        texto = cel["t"]
+        # 1. Padrão com 'T' ou 'Turma' explícito (ex: "T01", "T-01", "T 1", "Turma 2", "T01/T02")
+        re_t = re.finditer(r'(?:-\s*|/\s*)?(?:T\s*[\-_]?\s*|Turma\s+)(\d{1,2})', texto, flags=re.IGNORECASE)
+        for m in re_t:
+            n = int(m.group(1))
+            if n not in nums:
+                nums.append(n)
+
+        # 2. Padrão numérico isolado após hífen/barra para pós-graduação ou disciplinas tronco
+        if not nums:
+            re_num = re.finditer(r'(?:-\s*|/\s*)(\d{1,2})(?:\s*(?:e|E|/)\s*(\d{1,2}))?(?:\s*$|\s+(?:pv|tv|pós|pos|/))', texto, flags=re.IGNORECASE)
+            for m in re_num:
+                if m.group(1):
+                    n1 = int(m.group(1))
+                    if n1 not in nums:
+                        nums.append(n1)
+                if m.group(2):
+                    n2 = int(m.group(2))
+                    if n2 not in nums:
+                        nums.append(n2)
+
+    cel["_turmasNums"] = nums
+    cel["_temTurma"] = len(nums) > 0
+    return nums
+
+
+def extrair_disciplinas_e_turmas_da_grade(grade):
+    """
+    Espelho Python fiel de extrairDisciplinasETurmasDaGrade (src/scripts.html).
+    Retorna (mapa_disciplinas, freq_departamentos).
+    """
+    mapa = {}
+    freq_deptos = {}
+
+    if not grade or not isinstance(grade, list):
+        return mapa, freq_deptos
+
+    for linha in grade:
+        if not isinstance(linha, list):
+            continue
+        for cel in linha:
+            if not cel or not cel.get("d") or not isinstance(cel["d"], list):
+                continue
+            turmas_nums = extrair_turmas_numericas_da_celula(cel)
+            deptos_vistos_na_celula = set()
+
+            for cod_raw in cel["d"]:
+                cod = str(cod_raw).strip().upper()
+                if not cod:
+                    continue
+
+                sigla_depto = ""
+                m_letras = re.match(r'^[A-Za-z]{3}', cod)
+                if m_letras:
+                    sigla_depto = m_letras.group(0).upper()
+                else:
+                    m_num = re.match(r'^(\d{3})\d{4}$', cod)
+                    if m_num:
+                        sigla_depto = m_num.group(1)
+
+                if sigla_depto:
+                    deptos_vistos_na_celula.add(sigla_depto)
+
+                if cod not in mapa:
+                    mapa[cod] = {"temSemTurma": False, "turmas": set()}
+
+                info = mapa[cod]
+                if turmas_nums:
+                    for t in turmas_nums:
+                        info["turmas"].add(t)
+                else:
+                    info["temSemTurma"] = True
+
+            for sigla in deptos_vistos_na_celula:
+                freq_deptos[sigla] = freq_deptos.get(sigla, 0) + 1
+
+    return mapa, freq_deptos
 
 
 CATALOGO_DEPARTAMENTOS = [
@@ -56,131 +157,118 @@ CATALOGO_DEPARTAMENTOS = [
     {"sigla": "IAU", "nome": "Arquitetura e Urbanismo", "apelido": "Arquitetura", "unidade": "IAU", "keywords": ["arquitetura", "urbanismo", "desenho", "projeto", "paisagismo", "historia arquitetura"]}
 ]
 
-DOCENTES_SEMENTE = [
-    {"nome": "Carlos Alberto Fortulan", "depto": "SEM"},
-    {"nome": "Marcelo Becker", "depto": "SEM"},
-    {"nome": "Glauco Augusto de Paula Caurin", "depto": "SEM"},
-    {"nome": "Paulo Seleghim Junior", "depto": "SEM"},
-    {"nome": "Fernando Martini Catalano", "depto": "SEM/SAA"},
-    {"nome": "Zilda de Castro Silveira", "depto": "SEM"},
-    {"nome": "Adriano Almeida Gonçalves Siqueira", "depto": "SEM"},
-    {"nome": "Carlos De Marqui Junior", "depto": "SAA/SEM"},
-    {"nome": "Daniel Varela Magalhães", "depto": "SEM"},
-    {"nome": "Álvaro Manoel de Souza Soares", "depto": "SEM"},
-
-    {"nome": "Carlos Dias Maciel", "depto": "SEL"},
-    {"nome": "Denis Vinicius Coury", "depto": "SEL"},
-    {"nome": "Mario Oleskovicz", "depto": "SEL"},
-    {"nome": "Marcelo Andrade da Costa Vieira", "depto": "SEL"},
-    {"nome": "Eduardo Nobuhiro Asada", "depto": "SEL"},
-    {"nome": "João Paulo do Carmo", "depto": "SEL"},
-    {"nome": "Luís Fernando Costa Alberto", "depto": "SEL"},
-    {"nome": "Mário Alexandre Gazziro", "depto": "SEL"},
-    {"nome": "Sebastião E. Neto da Silva", "depto": "SEL"},
-
-    {"nome": "Sérgio Persival Baroncini Proença", "depto": "SET"},
-    {"nome": "Vladimir Guilherme Haach", "depto": "SET"},
-    {"nome": "Maximiliano dos Santos Anversa", "depto": "SET"},
-    {"nome": "José Samuel Giongo", "depto": "SET"},
-    {"nome": "Jorge Munaiar Neto", "depto": "SET"},
-    {"nome": "Luciana Maria Bonvino Figueiredo", "depto": "SET"},
-    {"nome": "Rodrigo Ribeiro Paccola", "depto": "SET"},
-
-    {"nome": "Aldo Roberto Ometto", "depto": "SEP"},
-    {"nome": "Daisy Aparecida do Carmo Curtolo", "depto": "SEP"},
-    {"nome": "Daniel Capaldo Amaral", "depto": "SEP"},
-    {"nome": "Mateus Cecilio Gerolamo", "depto": "SEP"},
-    {"nome": "Janaina Mascarenhas Hornos da Costa", "depto": "SEP"},
-    {"nome": "Edisio Alves de Aguiar Junior", "depto": "SEP"},
-
-    {"nome": "Carlos Alberto Della Rovere", "depto": "SMM"},
-    {"nome": "Haroldo Cavalcanti Pinto", "depto": "SMM"},
-    {"nome": "Antonio Jorge Abdalla", "depto": "SMM"},
-    {"nome": "Edson Antonio Ticianelli", "depto": "IQSC/SMM"},
-
-    {"nome": "Edson Cezar Wendland", "depto": "SHS"},
-    {"nome": "Maria do Carmo Calijuri", "depto": "SHS"},
-    {"nome": "Rodrigo de Melo Porto", "depto": "SHS"},
-    {"nome": "Lyda Patricia Sabogal Paz", "depto": "SHS"},
-
-    {"nome": "Lázaro Valentin Zuquette", "depto": "SGS"},
-    {"nome": "Tacio Mauro Pereira de Campos", "depto": "SGS"},
-    {"nome": "Maria Eugenia Gimenez Boscov", "depto": "SGS"},
-
-    {"nome": "Alvaro Martins Abdalla", "depto": "SAA"},
-    {"nome": "Hernan Dario Ceron Muñoz", "depto": "SAA"},
-    {"nome": "James Waterhouse", "depto": "SAA"},
-
-    {"nome": "Cira Souza Pitombo", "depto": "STT"},
-    {"nome": "José Leomar Fernandes Júnior", "depto": "STT"},
-    {"nome": "Antônio Nélson Rodrigues da Silva", "depto": "STT"},
-    {"nome": "Ana Paula Camargo Larocca", "depto": "STT"},
-
-    {"nome": "Daniel Smania", "depto": "SMA"},
-    {"nome": "Hildebrando Munhoz Rodrigues", "depto": "SMA"},
-    {"nome": "Alexandre Nolasco de Carvalho", "depto": "SMA"},
-    {"nome": "Ana Claudia Nabarro", "depto": "SMA"},
-    {"nome": "Tiago Picon", "depto": "SMA"},
-    {"nome": "Reginaldo Demarque", "depto": "SMA"},
-
-    {"nome": "Francisco Louzada Neto", "depto": "SME"},
-    {"nome": "Cynthia de Oliveira Lage Ferreira", "depto": "SME"},
-    {"nome": "Juliana Cobre", "depto": "SME"},
-    {"nome": "José Alberto Cuminato", "depto": "SME"},
-
-    {"nome": "Vanderlei Salvador Bagnato", "depto": "IFSC"},
-    {"nome": "Tito José Bonagamba", "depto": "IFSC"},
-    {"nome": "Yvonne Primerano Mascarenhas", "depto": "IFSC"},
-    {"nome": "Luiz Vitor de Souza Filho", "depto": "IFSC"},
-    {"nome": "Euclydes Marega Junior", "depto": "IFSC"}
+# Grade representativa e canônica para os testes de regressão do sistema
+GRADE_CANONICA_TESTES = [
+    [
+        {"d": ["SEM0500"], "turmas": ["01"], "t": "SEM0500 - T01 tv"},
+        {"d": ["SEM0501"], "turmas": ["01"], "t": "SEM0501 - T01"},
+        {"d": ["SEM0538"], "turmas": ["01"], "t": "SEM0538 - T01"},
+        {"d": ["SEL0353"], "turmas": ["01"], "t": "SEL0353 - T01"},
+        {"d": ["SEL0414"], "turmas": ["01"], "t": "SEL0414 - T01"},
+        {"d": ["SET0188"], "turmas": ["01"], "t": "SET0188 - T01"},
+        {"d": ["SET0198"], "turmas": ["01"], "t": "SET0198 - T01"},
+        {"d": ["SET0403"], "turmas": ["01"], "t": "SET0403 - T01"},
+        {"d": ["SEP0142"], "turmas": ["01"], "t": "SEP0142 - T01"},
+        {"d": ["SMM0193"], "turmas": ["01"], "t": "SMM0193 - T01"},
+        {"d": ["SHS0360"], "turmas": ["01"], "t": "SHS0360 - T01"},
+        {"d": ["SGS0100"], "turmas": ["01"], "t": "SGS0100 - T01"},
+        {"d": ["SAA0100"], "turmas": ["01"], "t": "SAA0100 - T01"},
+        {"d": ["STT0410"], "turmas": ["01"], "t": "STT0410 - T01"}
+    ],
+    [
+        {"d": ["SMA0301"], "turmas": ["01"], "t": "SMA0301 - T01"},
+        {"d": ["SMA0354"], "turmas": ["01"], "t": "SMA0354 - T01"},
+        {"d": ["SMA0355"], "turmas": ["01"], "t": "SMA0355 - T01"},
+        {"d": ["SMA0356"], "turmas": ["01"], "t": "SMA0356 - T01"},
+        {"d": ["SMA0300"], "turmas": ["01"], "t": "SMA0300 - T01"},
+        {"d": ["SMA0305"], "turmas": ["01"], "t": "SMA0305 - T01"},
+        {"d": ["SME0340"], "turmas": ["01"], "t": "SME0340 - T01"},
+        {"d": ["SME0300"], "turmas": ["01"], "t": "SME0300 - T01"},
+        {"d": ["7600005"], "turmas": ["01"], "t": "7600005 - T01"},
+        {"d": ["7600006"], "turmas": ["01"], "t": "7600006 - T01"},
+        {"d": ["7600007"], "turmas": ["01"], "t": "7600007 - T01"},
+        {"d": ["7600008"], "turmas": ["01"], "t": "7600008 - T01"},
+        {"d": ["SLC0100"], "turmas": ["01"], "t": "SLC0100 - T01"},
+        {"d": ["SQM0400"], "turmas": ["01"], "t": "SQM0400 - T01"},
+        {"d": ["SSC0108"], "turmas": ["01"], "t": "SSC0108 - T01"},
+        {"d": ["SSC0100"], "turmas": ["01"], "t": "SSC0100 - T01"},
+        {"d": ["SEL0999"], "turmas": ["01"], "t": "SEL0999 - T01"}
+    ]
 ]
 
-
-DISCIPLINAS_SEMENTE = [
-    {"codigo": "SMA0301", "nome": "Cálculo I"},
-    {"codigo": "SMA0354", "nome": "Cálculo II"},
-    {"codigo": "SMA0355", "nome": "Cálculo III"},
-    {"codigo": "SMA0356", "nome": "Cálculo IV"},
-    {"codigo": "SMA0300", "nome": "Geometria Analítica"},
-    {"codigo": "SMA0305", "nome": "Álgebra Linear"},
-    {"codigo": "SME0340", "nome": "Cálculo Numérico"},
-    {"codigo": "SME0300", "nome": "Estatística e Probabilidade"},
-    {"codigo": "7600005", "nome": "Física I"},
-    {"codigo": "7600006", "nome": "Física II"},
-    {"codigo": "7600007", "nome": "Física III"},
-    {"codigo": "7600008", "nome": "Física IV"},
-    {"codigo": "SQM0400", "nome": "Química Geral"},
-    {"codigo": "SET0188", "nome": "Resistência dos Materiais I"},
-    {"codigo": "SET0198", "nome": "Resistência dos Materiais II"},
-    {"codigo": "SET0403", "nome": "Mecânica das Estruturas I"},
-    {"codigo": "SEM0500", "nome": "Mecânica Geral I"},
-    {"codigo": "SEM0501", "nome": "Mecanismos"},
-    {"codigo": "SEM0538", "nome": "Mecânica dos Sólidos"},
-    {"codigo": "SEM0533", "nome": "Termodinâmica Aplicada"},
-    {"codigo": "SHS0360", "nome": "Mecânica dos Fluidos"},
-    {"codigo": "SEL0353", "nome": "Circuitos Elétricos I"},
-    {"codigo": "SEL0414", "nome": "Eletromagnetismo"},
-    {"codigo": "SEP0142", "nome": "Introdução à Engenharia de Produção"},
-    {"codigo": "SMM0193", "nome": "Ciência dos Materiais"},
-    {"codigo": "SAA0100", "nome": "Introdução à Engenharia Aeronáutica"},
-    {"codigo": "STT0410", "nome": "Engenharia de Transportes"},
-    {"codigo": "SSC0108", "nome": "Introdução à Ciência da Computação"}
-]
+CACHE_CANONICO_TESTES = {
+    "SEM0500": {
+        "codigo": "SEM0500", "nome": "Mecânica Geral I",
+        "turmas": {
+            "01": {"numero": "01", "docentes": ["Carlos Alberto Fortulan", "Marcelo Becker", "Fernando Martini Catalano"]}
+        }
+    },
+    "SEL0353": {
+        "codigo": "SEL0353", "nome": "Circuitos Elétricos I",
+        "turmas": {
+            "01": {"numero": "01", "docentes": ["Carlos Dias Maciel", "Denis Vinicius Coury"]}
+        }
+    },
+    "SET0188": {
+        "codigo": "SET0188", "nome": "Resistência dos Materiais I",
+        "turmas": {
+            "01": {"numero": "01", "docentes": ["Sérgio Persival Baroncini Proença", "Vladimir Guilherme Haach"]}
+        }
+    },
+    "SET0198": {
+        "codigo": "SET0198", "nome": "Resistência dos Materiais II",
+        "turmas": {"01": {"numero": "01", "docentes": ["Sérgio Persival Baroncini Proença"]}}
+    },
+    "SMA0301": {"codigo": "SMA0301", "nome": "Cálculo I", "turmas": {"01": {"numero": "01", "docentes": ["Daniel Smania"]}}},
+    "SMA0354": {"codigo": "SMA0354", "nome": "Cálculo II", "turmas": {"01": {"numero": "01", "docentes": ["Hildebrando Munhoz Rodrigues"]}}},
+    "SMA0355": {"codigo": "SMA0355", "nome": "Cálculo III", "turmas": {"01": {"numero": "01", "docentes": ["Alexandre Nolasco de Carvalho"]}}},
+    "SMA0356": {
+        "codigo": "SMA0356", "nome": "Cálculo IV",
+        "turmas": {
+            "01": {"numero": "01", "docentes": ["Ana Claudia Nabarro", "Reginaldo Demarque"]}
+        }
+    },
+    "7600005": {"codigo": "7600005", "nome": "Física I", "turmas": {"01": {"numero": "01", "docentes": ["Vanderlei Salvador Bagnato"]}}},
+    "7600006": {"codigo": "7600006", "nome": "Física II", "turmas": {"01": {"numero": "01", "docentes": ["Tito José Bonagamba"]}}},
+    "SLC0100": {"codigo": "SLC0100", "nome": "Física Experimental", "turmas": {"01": {"numero": "01", "docentes": ["Euclydes Marega Junior"]}}}
+}
 
 
 class AutocompleteEngine:
     """Motor de busca e autocomplete em memória espelhando src/scripts.html."""
 
-    def __init__(self, catalogo=None, docentes_semente=None, disciplinas_semente=None):
+    def __init__(self, catalogo=None, dados_grade=None, cache_jupiter=None):
         self.catalogo = catalogo or CATALOGO_DEPARTAMENTOS
         self.mapa_docentes = {}
         self.mapa_disciplinas = {}
+        self.mapa_grade_disciplinas = {}
+        self.departamentos_ativos = {}
 
-        for d in (docentes_semente or DOCENTES_SEMENTE):
-            self.indexar_docente(d["nome"], d.get("depto", ""), None)
+        grade_inicial = dados_grade if dados_grade is not None else GRADE_CANONICA_TESTES
+        cache_inicial = cache_jupiter if cache_jupiter is not None else (CACHE_CANONICO_TESTES if dados_grade is None else {})
+        self.reindexar_grade(grade_inicial, cache_inicial)
 
-        for disc in (disciplinas_semente or DISCIPLINAS_SEMENTE):
-            self.indexar_disciplina(disc["codigo"], disc["nome"])
+    def reindexar_grade(self, dados_grade, cache_jupiter=None):
+        """Reconstrói os índices exclusivamente da grade atual e dos dados em cache."""
+        self.mapa_docentes.clear()
+        self.mapa_disciplinas.clear()
+
+        disciplinas, deptos = extrair_disciplinas_e_turmas_da_grade(dados_grade)
+        self.mapa_grade_disciplinas = disciplinas
+        self.departamentos_ativos = deptos
+
+        # 1. Indexa códigos das disciplinas encontradas na grade
+        for cod in disciplinas:
+            self.indexar_disciplina(cod, None)
+
+        # 2. Se houver dados em cache, enriquece nomes e docentes alocados
+        if cache_jupiter:
+            for cod, info in disciplinas.items():
+                dados = cache_jupiter.get(cod)
+                if dados:
+                    if dados.get("nome"):
+                        self.indexar_disciplina(cod, dados["nome"])
+                    self.indexar_de_dados_disciplina(cod, dados)
 
     def indexar_disciplina(self, codigo_raw, nome_raw):
         if not codigo_raw:
@@ -227,27 +315,76 @@ class AutocompleteEngine:
     def indexar_de_dados_disciplina(self, codigo, dados):
         if not dados:
             return
+        cod_limpo = str(codigo or "").strip().upper()
+        info_grade = self.mapa_grade_disciplinas.get(cod_limpo)
+
+        # Descarta se a disciplina não pertencer à grade ativa
+        if not info_grade:
+            return
+
         if dados.get("nome"):
-            self.indexar_disciplina(codigo, dados["nome"])
+            self.indexar_disciplina(cod_limpo, dados["nome"])
+
         if "turmas" not in dados:
             return
-        depto = codigo[:3].upper() if re.match(r'^[A-Za-z]{3}', str(codigo)) else ""
+
+        # Sigla departamental (suporta 3 letras ou 3 dígitos do IFSC como 760)
+        depto = ""
+        m_letras = re.match(r'^[A-Za-z]{3}', cod_limpo)
+        if m_letras:
+            depto = m_letras.group(0).upper()
+        else:
+            m_num = re.match(r'^(\d{3})\d{4}$', cod_limpo)
+            if m_num:
+                depto = m_num.group(1)
+
+        # Só restringe se houver turmas cadastradas E nenhuma ocorrência sem turma na grade
+        tem_turmas_restritas = len(info_grade["turmas"]) > 0 and not info_grade.get("temSemTurma", False)
+        turmas_permitidas = info_grade["turmas"]
+
         for t in dados["turmas"].values():
+            if tem_turmas_restritas:
+                num_raw = t.get("numero") or t.get("ofe")
+                try:
+                    num_t = int(num_raw)
+                except (ValueError, TypeError):
+                    num_t = -1
+
+                casa_turma = (num_t in turmas_permitidas)
+                if not casa_turma and t.get("codigoTurma"):
+                    casa_turma = any(str(t["codigoTurma"]).endswith(str(n).zfill(2)) for n in turmas_permitidas)
+
+                if not casa_turma:
+                    continue
+
             for d in t.get("docentes", []):
-                self.indexar_docente(d, depto, codigo)
+                self.indexar_docente(d, depto, cod_limpo)
             for h in t.get("horarios", []):
                 if h.get("docente"):
-                    self.indexar_docente(h["docente"], depto, codigo)
+                    self.indexar_docente(h["docente"], depto, cod_limpo)
                 for p in h.get("professores", []):
-                    self.indexar_docente(p, depto, codigo)
+                    self.indexar_docente(p, depto, cod_limpo)
 
     def buscar_sugestoes(self, termo):
         termo_str = str(termo or "").strip()
+        deptos_ativos = self.departamentos_ativos or {}
+        grade_carregando = not self.mapa_grade_disciplinas and not self.departamentos_ativos
+
         if not termo_str:
+            deptos_sugeridos = []
+            if not grade_carregando:
+                deptos_sugeridos = [
+                    d for d in self.catalogo if d["sigla"] in deptos_ativos
+                ]
+                deptos_sugeridos.sort(
+                    key=lambda d: (-deptos_ativos.get(d["sigla"], 0), d["sigla"])
+                )
+
             return {
                 "termo": "",
                 "ehVazio": True,
-                "departamentos": self.catalogo[:6],
+                "gradeCarregando": grade_carregando,
+                "departamentos": deptos_sugeridos[:8],
                 "disciplinas": [],
                 "docentes": [],
                 "acoesRapidas": [
@@ -259,9 +396,12 @@ class AutocompleteEngine:
 
         t_norm = normalizar_texto(termo_str)
 
-        # 1. Departamentos
+        # 1. Departamentos (Restrito ESTRITAMENTE aos departamentos com aulas na grade ativa)
         deptos_encontrados = []
         for dep in self.catalogo:
+            if dep["sigla"] not in deptos_ativos:
+                continue
+
             s_norm = normalizar_texto(dep["sigla"])
             n_norm = normalizar_texto(dep["nome"])
             a_norm = normalizar_texto(dep["apelido"])
@@ -339,6 +479,7 @@ class AutocompleteEngine:
         return {
             "termo": termo_str,
             "ehVazio": False,
+            "gradeCarregando": False,
             "departamentos": deptos_encontrados[:6],
             "disciplinas": disciplinas_encontradas[:5],
             "docentes": docentes_encontrados[:6],
@@ -356,12 +497,10 @@ class TestAutocompleteLogic(unittest.TestCase):
         """Valida que digitar 'se' prioriza SEM, SEL, SET, SEP."""
         res = self.engine.buscar_sugestoes("se")
         siglas = [d["sigla"] for d in res["departamentos"]]
-        # Deve conter os 4 departamentos da EESC com prefixo SE
         self.assertIn("SEM", siglas)
         self.assertIn("SEL", siglas)
         self.assertIn("SET", siglas)
         self.assertIn("SEP", siglas)
-        # As primeiras 4 posições devem ter pontuação >= 80 (prefix match)
         for d in res["departamentos"][:4]:
             self.assertGreaterEqual(d["pontuacao"], 80)
 
@@ -375,24 +514,19 @@ class TestAutocompleteLogic(unittest.TestCase):
 
     def test_busca_departamento_por_apelido_ou_nome(self):
         """Valida busca por nomes amigáveis: mecanica, eletrica, estruturas, calculo, fisica."""
-        # 1. Mecânica -> SEM
         res_mec = self.engine.buscar_sugestoes("mecanica")
         self.assertEqual(res_mec["departamentos"][0]["sigla"], "SEM")
 
-        # 2. Elétrica -> SEL
         res_ele = self.engine.buscar_sugestoes("eletrica")
         self.assertEqual(res_ele["departamentos"][0]["sigla"], "SEL")
 
-        # 3. Estruturas -> SET
         res_est = self.engine.buscar_sugestoes("estruturas")
         self.assertEqual(res_est["departamentos"][0]["sigla"], "SET")
 
-        # 4. Cálculo -> SMA
         res_calc = self.engine.buscar_sugestoes("calculo")
         siglas_calc = [d["sigla"] for d in res_calc["departamentos"]]
         self.assertIn("SMA", siglas_calc)
 
-        # 5. Física -> 760 e SLC
         res_fis = self.engine.buscar_sugestoes("fisica")
         siglas_fis = [d["sigla"] for d in res_fis["departamentos"]]
         self.assertIn("760", siglas_fis)
@@ -420,6 +554,7 @@ class TestAutocompleteLogic(unittest.TestCase):
         dados_novos = {
             "turmas": {
                 "01": {
+                    "numero": "01",
                     "docentes": ["Prof. Dr. Ada Lovelace (R)"],
                     "horarios": [{"docente": "Alan Turing"}]
                 }
@@ -427,11 +562,9 @@ class TestAutocompleteLogic(unittest.TestCase):
         }
         self.engine.indexar_de_dados_disciplina("SSC0100", dados_novos)
 
-        # Busca por Ada
         res_ada = self.engine.buscar_sugestoes("ada")
         self.assertTrue(any(d["nome"] == "Ada Lovelace" and d["depto"] == "SSC" for d in res_ada["docentes"]))
 
-        # Busca por Turing
         res_turing = self.engine.buscar_sugestoes("turing")
         self.assertTrue(any(d["nome"] == "Alan Turing" and d["depto"] == "SSC" for d in res_turing["docentes"]))
 
@@ -485,12 +618,220 @@ class TestAutocompleteLogic(unittest.TestCase):
         res = self.engine.buscar_sugestoes("quantica")
         self.assertTrue(any(d["codigo"] == "SEL0999" and "Quântica" in d["nome"] for d in res["disciplinas"]))
 
-    def test_termo_vazio_retorna_atalhos(self):
-        """Valida que busca vazia devolve ações rápidas e top 6 departamentos."""
+    def test_termo_vazio_retorna_atalhos_e_departamentos(self):
+        """Valida que busca vazia devolve ações rápidas e top departamentos ativos."""
         res = self.engine.buscar_sugestoes("")
         self.assertTrue(res["ehVazio"])
         self.assertEqual(len(res["acoesRapidas"]), 3)
-        self.assertEqual(len(res["departamentos"]), 6)
+        self.assertGreaterEqual(len(res["departamentos"]), 4)
+        self.assertEqual(len(res["disciplinas"]), 0)
+        self.assertEqual(len(res["docentes"]), 0)
+
+    # -------------------------------------------------------------
+    # NOVOS TESTES UNITÁRIOS PARA CADA PEÇA NOVA IMPLEMENTADA
+    # -------------------------------------------------------------
+
+    def test_extrair_turmas_numericas_da_celula(self):
+        """Valida extração resiliente de turmas: cel.turmas, regex T01, T1/T2, SEP5864 - 1 e sem turma."""
+        # 1. cel.turmas explícito
+        cel1 = {"t": "SEM0500 - T01 tv", "turmas": ["01"]}
+        self.assertEqual(extrair_turmas_numericas_da_celula(cel1), [1])
+
+        # 2. Turmas compartilhadas no texto
+        cel2 = {"t": "SMA0356 - T01/T02"}
+        self.assertEqual(extrair_turmas_numericas_da_celula(cel2), [1, 2])
+
+        # 3. Pós-graduação com hífen
+        cel3 = {"t": "SEP5864 - 1"}
+        self.assertEqual(extrair_turmas_numericas_da_celula(cel3), [1])
+
+        # 4. Pós-graduação com barra e dois dígitos
+        cel4 = {"t": "SHS5991 / 02"}
+        self.assertEqual(extrair_turmas_numericas_da_celula(cel4), [2])
+
+        # 5. Célula sem turma indicada
+        cel5 = {"t": "SMA0300 - Geometria Analítica"}
+        self.assertEqual(extrair_turmas_numericas_da_celula(cel5), [])
+
+    def test_extrair_disciplinas_e_turmas_da_grade(self):
+        """Valida agregação correta da grade em O(1), frequências e flag temSemTurma."""
+        grade_mock = [
+            [
+                {"d": ["SEM0500"], "turmas": ["01"], "t": "SEM0500 - T01"},
+                {"d": ["SMA0356"], "turmas": ["01"], "t": "SMA0356 - T01"}
+            ],
+            [
+                {"d": ["SEM0500"], "turmas": ["02"], "t": "SEM0500 - T02"},
+                {"d": ["7600006"], "t": "7600006 - Física II"}  # sem turma explícita
+            ]
+        ]
+        disciplinas, deptos = extrair_disciplinas_e_turmas_da_grade(grade_mock)
+
+        self.assertIn("SEM0500", disciplinas)
+        self.assertEqual(disciplinas["SEM0500"]["turmas"], {1, 2})
+        self.assertFalse(disciplinas["SEM0500"]["temSemTurma"])
+
+        self.assertIn("7600006", disciplinas)
+        self.assertTrue(disciplinas["7600006"]["temSemTurma"])
+
+        self.assertEqual(deptos.get("SEM"), 2)
+        self.assertEqual(deptos.get("SMA"), 1)
+        self.assertEqual(deptos.get("760"), 1)
+        self.assertNotIn("IAU", deptos)
+
+    def test_disciplina_fora_da_grade_nao_gera_chip(self):
+        """Valida que disciplina ausente na grade alocada não é sugerida no autocomplete."""
+        grade_exclusiva = [[{"d": ["SEM0500"], "turmas": ["01"], "t": "SEM0500 - T01"}]]
+        engine = AutocompleteEngine(dados_grade=grade_exclusiva)
+
+        res = engine.buscar_sugestoes("SMA0355")
+        self.assertEqual(len(res["disciplinas"]), 0)
+
+        res2 = engine.buscar_sugestoes("SEM0500")
+        self.assertEqual(len(res2["disciplinas"]), 1)
+        self.assertEqual(res2["disciplinas"][0]["codigo"], "SEM0500")
+
+    def test_docente_fora_da_grade_nao_gera_chip(self):
+        """Valida que docente histórico ausente na grade ativa não gera sugestão no autocomplete."""
+        grade_exclusiva = [[{"d": ["SEM0500"], "turmas": ["01"], "t": "SEM0500 - T01"}]]
+        cache = {
+            "SEM0500": {
+                "turmas": {
+                    "01": {"numero": "01", "docentes": ["Carlos Alberto Fortulan"]}
+                }
+            }
+        }
+        engine = AutocompleteEngine(dados_grade=grade_exclusiva, cache_jupiter=cache)
+
+        # Fortulan está alocado na turma 01 de SEM0500
+        res_fortulan = engine.buscar_sugestoes("Fortulan")
+        self.assertEqual(len(res_fortulan["docentes"]), 1)
+        self.assertEqual(res_fortulan["docentes"][0]["nome"], "Carlos Alberto Fortulan")
+
+        # Maciel e Proença não estão na grade exclusiva -> não devem aparecer
+        res_maciel = engine.buscar_sugestoes("Maciel")
+        self.assertEqual(len(res_maciel["docentes"]), 0)
+
+        res_proenca = engine.buscar_sugestoes("Proença")
+        self.assertEqual(len(res_proenca["docentes"]), 0)
+
+    def test_docente_de_turma_alocada_vs_turma_nao_alocada(self):
+        """Valida que em disciplina com Turma 01 na grade e Turma 02 fora da grade, só Turma 01 é indexada."""
+        grade = [[{"d": ["SEM0500"], "turmas": ["01"], "t": "SEM0500 - T01"}]]
+        dados_jupiter = {
+            "turmas": {
+                "01": {"numero": "01", "docentes": ["Prof. Alocado Na Grade"]},
+                "02": {"numero": "02", "docentes": ["Prof. Substituto Nao Alocado"]}
+            }
+        }
+        engine = AutocompleteEngine(dados_grade=grade)
+        engine.indexar_de_dados_disciplina("SEM0500", dados_jupiter)
+
+        res_alocado = engine.buscar_sugestoes("Alocado Na Grade")
+        self.assertTrue(any("Alocado Na Grade" in d["nome"] for d in res_alocado["docentes"]))
+
+        res_nao_alocado = engine.buscar_sugestoes("Nao Alocado")
+        self.assertEqual(len(res_nao_alocado["docentes"]), 0)
+
+    def test_disciplina_sem_turma_aceita_docentes_fallback(self):
+        """Valida que quando uma célula não especifica turma (temSemTurma), docentes não sofrem falso negativo."""
+        grade = [[{"d": ["SMA0300"], "t": "SMA0300 - Geometria Analítica"}]]
+        dados_jupiter = {
+            "turmas": {
+                "01": {"numero": "01", "docentes": ["Docente Turma 01"]},
+                "02": {"numero": "02", "docentes": ["Docente Turma 02"]}
+            }
+        }
+        engine = AutocompleteEngine(dados_grade=grade)
+        engine.indexar_de_dados_disciplina("SMA0300", dados_jupiter)
+
+        res1 = engine.buscar_sugestoes("Docente Turma 01")
+        self.assertEqual(len(res1["docentes"]), 1)
+
+        res2 = engine.buscar_sugestoes("Docente Turma 02")
+        self.assertEqual(len(res2["docentes"]), 1)
+
+    def test_departamento_sem_disciplina_nao_aparece(self):
+        """Valida que departamento inativo na grade não aparece nem nos atalhos nem na busca textual."""
+        grade = [[{"d": ["SEM0500"], "turmas": ["01"]}, {"d": ["SMA0356"], "turmas": ["01"]}]]
+        engine = AutocompleteEngine(dados_grade=grade)
+
+        # Estado vazio
+        res_vazio = engine.buscar_sugestoes("")
+        siglas_vazio = [d["sigla"] for d in res_vazio["departamentos"]]
+        self.assertIn("SEM", siglas_vazio)
+        self.assertIn("SMA", siglas_vazio)
+        self.assertNotIn("IAU", siglas_vazio)
+        self.assertNotIn("SEL", siglas_vazio)
+
+        # Busca textual
+        res_iau = engine.buscar_sugestoes("arquitetura")
+        self.assertEqual(len(res_iau["departamentos"]), 0)
+
+    def test_departamentos_frequentes_ordenados_por_volume(self):
+        """Valida ordenação decrescente por quantidade real de aulas alocadas no semestre."""
+        grade = [
+            [{"d": ["SEM0500"]}, {"d": ["SEM0501"]}, {"d": ["SEM0538"]}],
+            [{"d": ["SMA0356"]}, {"d": ["SMA0301"]}],
+            [{"d": ["SET0188"]}]
+        ]
+        engine = AutocompleteEngine(dados_grade=grade)
+        res = engine.buscar_sugestoes("")
+        siglas = [d["sigla"] for d in res["departamentos"]]
+        self.assertEqual(siglas[0], "SEM")
+        self.assertEqual(siglas[1], "SMA")
+        self.assertEqual(siglas[2], "SET")
+
+    def test_disciplina_numerica_ifsc_760(self):
+        """Valida extração e associação de disciplina numérica 7600006 com departamento 760."""
+        grade = [[{"d": ["7600006"], "turmas": ["01"], "t": "7600006 - T01"}]]
+        dados_ifsc = {
+            "nome": "Física II",
+            "turmas": {
+                "01": {"numero": "01", "docentes": ["Tito José Bonagamba"]}
+            }
+        }
+        engine = AutocompleteEngine(dados_grade=grade)
+        engine.indexar_de_dados_disciplina("7600006", dados_ifsc)
+
+        # Busca departamento 760
+        res_depto = engine.buscar_sugestoes("760")
+        self.assertTrue(any(d["sigla"] == "760" for d in res_depto["departamentos"]))
+
+        # Busca docente do 760
+        res_doc = engine.buscar_sugestoes("Bonagamba")
+        self.assertTrue(any(d["nome"] == "Tito José Bonagamba" and d["depto"] == "760" for d in res_doc["docentes"]))
+
+    def test_disciplina_pos_janus_sep5864(self):
+        """Valida disciplina de pós SEP5864 com oferecimento e turma do Janus."""
+        grade = [[{"d": ["SEP5864"], "turmas": ["01"], "t": "SEP5864 - 1"}]]
+        dados_janus = {
+            "nome": "Pesquisa Operacional Aplicada",
+            "turmas": {
+                "01": {
+                    "codigoTurma": "SEP5864-1",
+                    "ofe": "1",
+                    "numero": "01",
+                    "docentes": ["Carlos Dias Maciel"]
+                }
+            }
+        }
+        engine = AutocompleteEngine(dados_grade=grade)
+        engine.indexar_de_dados_disciplina("SEP5864", dados_janus)
+
+        res_disc = engine.buscar_sugestoes("SEP5864")
+        self.assertEqual(len(res_disc["disciplinas"]), 1)
+
+        res_maciel = engine.buscar_sugestoes("Maciel")
+        self.assertTrue(any(d["nome"] == "Carlos Dias Maciel" and d["depto"] == "SEP" for d in res_maciel["docentes"]))
+
+    def test_grade_carregando_vazia_nao_quebra(self):
+        """Valida comportamento resiliente quando a grade ainda não foi recebida do backend."""
+        engine = AutocompleteEngine(dados_grade=[])
+        res = engine.buscar_sugestoes("")
+        self.assertTrue(res["ehVazio"])
+        self.assertTrue(res["gradeCarregando"])
+        self.assertEqual(len(res["departamentos"]), 0)
         self.assertEqual(len(res["disciplinas"]), 0)
         self.assertEqual(len(res["docentes"]), 0)
 
@@ -504,8 +845,8 @@ class TestAutocompleteLogic(unittest.TestCase):
             self.assertIsInstance(res, dict)
             self.assertIn("departamentos", res)
             self.assertIn("disciplinas", res)
-            self.assertIn("docentes", res)
-            self.assertLessEqual(len(res["departamentos"]), 6)
+            limite_deptos = 8 if res["ehVazio"] else 6
+            self.assertLessEqual(len(res["departamentos"]), limite_deptos)
             self.assertLessEqual(len(res["disciplinas"]), 5)
             self.assertLessEqual(len(res["docentes"]), 6)
 
