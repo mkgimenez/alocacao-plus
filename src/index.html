@@ -15,7 +15,7 @@
       <div class="header-brand">
         <div class="brand-icon">💡</div>
         <div>
-          <h1 class="brand-title">Alocação Plus</h1>
+          <h1 class="brand-title">Alocação Plus <span class="badge-versao"><?= APP_FULL_VERSION ?></span></h1>
           <p class="brand-subtitle">EESC-USP | Consulta Inteligente de Grade e Ocupação</p>
         </div>
       </div>
@@ -24,7 +24,7 @@
           <span class="pulse-dot"></span>
           <span id="txt-ultima-sincronizacao">Carregando dados...</span>
         </div>
-        <button id="btn-recarregar-dados" class="btn-primary-outline" onclick="solicitarRecarregarDados()">
+        <button id="btn-recarregar-dados" class="btn-header-recarregar btn-primary-outline" onclick="solicitarRecarregarDados()">
           🔄 Atualizar Dados
         </button>
       </div>
@@ -146,7 +146,7 @@
       </div>
 
       <!-- Barra de Ações Rápidas e Busca de Salas -->
-      <div class="barra-acoes-grade">
+      <div class="barra-acoes-grade barra-resultados">
         <div class="acoes-esquerda">
           <button type="button" class="btn-toggle-livres" id="btn-modo-livres" onclick="alternarModoApenasLivres()">
             🚪 Apenas Salas Livres
@@ -161,6 +161,13 @@
           <button type="button" id="btn-toggle-colunas-match" class="btn-colunas-match" style="display: none;" onclick="alternarFocoColunasMatch()" title="Alternar entre ver apenas as colunas com resultado ou todas as colunas">
             🎯 Apenas colunas com resultado
           </button>
+          <div id="txt-contador-resultados" class="txt-contador-resultados">Carregando salas e horários...</div>
+          <div id="status-carregamento-dinamico" class="status-carregamento-dinamico" style="display: none;">
+            <span class="status-carregamento-texto"><i>Carregando dados do Jupiterweb/Janus</i></span>
+            <div class="progresso-dinamico-trilho">
+              <div id="barra-progresso-dinamico-fill" class="progresso-dinamico-barra" style="width: 0%;"></div>
+            </div>
+          </div>
         </div>
         <div class="acoes-direita">
           <button type="button" class="btn-reset" onclick="resetarTodosFiltros()">
@@ -170,17 +177,6 @@
       </div>
 
     </section>
-
-    <!-- Barra Informativa de Resultados -->
-    <div class="barra-resultados">
-      <div id="txt-contador-resultados">Carregando salas e horários...</div>
-      <div id="status-carregamento-dinamico" class="status-carregamento-dinamico" style="display: none;">
-        <span class="status-carregamento-texto"><i>Carregando dados do Jupiterweb/Janus</i></span>
-        <div class="progresso-dinamico-trilho">
-          <div id="barra-progresso-dinamico-fill" class="progresso-dinamico-barra" style="width: 0%;"></div>
-        </div>
-      </div>
-    </div>
 
     <!-- Área da Grade de Horários (Tabela) -->
     <section class="grade-section">
@@ -216,10 +212,6 @@
 
   </main>
 
-  <!-- Rodapé Discreto -->
-  <footer class="app-footer">
-    <span>Alocação Plus <span class="badge-versao"><?= APP_FULL_VERSION ?></span> • Escola de Engenharia de São Carlos (EESC-USP)</span>
-  </footer>
 
   <!-- Modal / Card Elegante de Informações da Disciplina (Jupiterweb) -->
   <div id="modal-card-disciplina" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-disc-codigo">

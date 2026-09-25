@@ -26,6 +26,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0016](0016-autocomplete-inteligente-campo-busca.md) | Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes) | **Aceito** | 2026-09-24 |
 | [0017](0017-coloracao-progressiva-e-priorizacao-viewport-2d.md) | Coloração Progressiva da Grade, Priorização Geométrica no Viewport 2D e Consolidação do Card Modal | **Aceito** | 2026-09-25 |
 | [0018](0018-chips-busca-exclusivos-grade-e-resiliencia-estado-vazio.md) | Chips da Busca Baseados Exclusivamente na Grade Atual e Resiliência do Estado Vazio | **Aceito** | 2026-09-25 |
+| [0019](0019-otimizacao-espaco-vertical-e-camadas-sticky.md) | Otimização de Espaço Vertical, Camadas Sticky da Grade e Refinamento do Cabeçalho | **Aceito** | 2026-09-25 |
 
 ---
 

@@ -69,6 +69,15 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.5.4:** Otimização de Espaço Vertical, Camadas Sticky da Grade & Refinamento do Cabeçalho:
+  - **Camadas Sticky no Scroll Horizontal (`z-index`):** Correção do deslizamento dos cabeçalhos de dias da semana (`.th-dia-header` com `z-index: 25`), que agora passam sob os cabeçalhos fixos de Salas e Lugares (`th.col-fixa-sala` e `th.col-fixa-cap` elevados para `z-index: 35 !important`), eliminando sobreposição visual indesejada;
+  - **Refatoração do Botão "Atualizar Dados":** Estilo limpo e harmonizado com o design system via classe `.btn-header-recarregar`, com fundo consistente em outline institucional e micro-interação tátil suave;
+  - **Maximização do Espaço Vertical da Grade:**
+    - Remoção da barra de rodapé (`.app-footer`), liberando área útil de tela diretamente para exibição das salas e horários;
+    - Realocação da identificação de versão (`.badge-versao`) para o cabeçalho superior ao lado do título "Alocação Plus", com estilo discreto sem borda de pílula, tipografia normal (sem negrito) e alinhamento na linha de base do título;
+    - Eliminação da linha avulsa `.barra-resultados`, movendo o contador de resultados (`#txt-contador-resultados`) e a barra discreta de progresso de carregamento em segundo plano (`#status-carregamento-dinamico`) para dentro da barra de ações à direita da caixa de busca, economizando mais ~30px verticais;
+  - **Responsividade & Alinhamento:** Estilos aprimorados para flexbox com quebra controlada em telas médias/móveis e layout fluido no desktop;
+  - Registro de governança arquitetural no ADR 0019.
 - [x] **v1.5.3:** Estabilização Dimensional da Caixa de Busca & Limpeza ao Primeiro Toque:
   - Estabilização dimensional definitiva da caixa de busca (`width: 290px;` fixo tanto em repouso quanto em foco), eliminando o salto de 60px (*Cumulative Layout Shift* = 0) e a quebra de alinhamento dos botões vizinhos;
   - Correção cirúrgica do botão de limpar busca (`×`): prevenção de `blur` prematuro via `onmousedown="event.preventDefault()"`, garantindo execução de `limparBusca()` ao primeiro toque (eliminação da necessidade de duplo clique e do deslocamento do botão sob o cursor);

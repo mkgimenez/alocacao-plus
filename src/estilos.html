@@ -101,6 +101,23 @@
     font-weight: 700;
     letter-spacing: -0.3px;
     color: #ffffff;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .badge-versao {
+    display: inline;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 400;
+    color: #d0e4f7;
+    background: transparent;
+    border: none;
+    padding: 0;
+    letter-spacing: 0.2px;
+    vertical-align: baseline;
   }
 
   .brand-subtitle {
@@ -139,6 +156,66 @@
     0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
     70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
     100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
+
+  /* Botão de Atualizar/Recarregar Dados no Cabeçalho (Estilo Original da v1.5.0) */
+  #btn-recarregar-dados,
+  .btn-header-recarregar,
+  .header-actions .btn-primary-outline {
+    background: transparent;
+    color: #ffffff;
+    border: 1.5px solid rgba(255, 255, 255, 0.65);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    transition: background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  #btn-recarregar-dados:hover,
+  .btn-header-recarregar:hover,
+  .header-actions .btn-primary-outline:hover {
+    background: #ffffff;
+    color: #104880;
+    border-color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  }
+
+  #btn-recarregar-dados:active,
+  .btn-header-recarregar:active,
+  .header-actions .btn-primary-outline:active {
+    transform: scale(0.96);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    transition-duration: 0.05s;
+  }
+
+  #btn-recarregar-dados:focus-visible,
+  .btn-header-recarregar:focus-visible,
+  .header-actions .btn-primary-outline:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+  }
+
+  #btn-recarregar-dados:disabled,
+  .btn-header-recarregar:disabled,
+  .header-actions .btn-primary-outline:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 
   /* --------------------------------------------------------------------------
@@ -765,10 +842,20 @@
     border-top: 1px solid var(--border-color);
   }
 
-  .acoes-esquerda, .acoes-direita {
+  .acoes-esquerda {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .acoes-direita {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
   }
 
   .busca-sala-wrapper {
@@ -1146,43 +1233,39 @@
   }
 
   /* --------------------------------------------------------------------------
-     Barra de Resultados e Legendas
+     Contador de Resultados e Progresso Dinâmico (Inline na Barra de Ações)
      -------------------------------------------------------------------------- */
   .barra-resultados {
-    position: relative;
-    flex-shrink: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    /* Identificador de compatibilidade mantido na barra de ações */
+  }
+
+  .txt-contador-resultados {
     font-size: 11.5px;
     color: var(--text-muted);
     font-weight: 500;
-    padding: 0 4px;
-    min-height: 20px;
+    white-space: nowrap;
+    line-height: 1.4;
+    user-select: none;
+    margin-left: 4px;
   }
 
-  .barra-resultados.carregando-dinamico #txt-contador-resultados {
-    max-width: calc(50% - 190px);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .txt-contador-resultados strong {
+    color: var(--text-main);
+    font-weight: 600;
   }
 
   .status-carregamento-dinamico {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-size: 11.5px;
     font-weight: 400; /* Sem negrito */
     color: #104880; /* Azul marinho idêntico ao fundo do cabeçalho de Salas */
     white-space: nowrap;
     pointer-events: none;
-    z-index: 5;
     opacity: 1;
     transition: opacity 0.35s ease;
+    margin-left: 6px;
   }
 
   .status-carregamento-dinamico.ocultando {
@@ -1336,14 +1419,16 @@
     border-right: 2px solid #94a3b8;
   }
 
-  .tabela-grade thead th.col-fixa-sala {
-    z-index: 30;
+  .tabela-grade thead th.col-fixa-sala,
+  .tabela-grade thead tr:first-child th.col-fixa-sala {
+    z-index: 35 !important;
     background: #104880;
     color: #ffffff;
   }
 
-  .tabela-grade thead th.col-fixa-cap {
-    z-index: 30;
+  .tabela-grade thead th.col-fixa-cap,
+  .tabela-grade thead tr:first-child th.col-fixa-cap {
+    z-index: 35 !important;
     background: #104880;
     color: #ffffff;
   }
@@ -1363,6 +1448,10 @@
   }
 
   /* Diferenciação Visual de Colunas por Dia (Cabeçalhos e Linhas de Detalhe) */
+  .tabela-grade thead th.th-dia-header {
+    z-index: 25;
+  }
+
   .tabela-grade thead th.th-dia-header.dia-par {
     background: #104880;
   }
@@ -1695,22 +1784,6 @@
   }
 
   /* --------------------------------------------------------------------------
-     Footer
-     -------------------------------------------------------------------------- */
-  .app-footer {
-    flex-shrink: 0;
-    background: #ffffff;
-    border-top: 1px solid var(--border-color);
-    padding: 6px 20px;
-    font-size: 11px;
-    color: var(--text-subtle);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-  }
-
-  /* --------------------------------------------------------------------------
      Responsividade Básica
      -------------------------------------------------------------------------- */
   @media (max-width: 768px) {
@@ -1721,6 +1794,23 @@
     .barra-acoes-grade {
       flex-direction: column;
       align-items: stretch;
+      gap: 10px;
+    }
+    .acoes-esquerda {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .acoes-direita {
+      justify-content: flex-end;
+    }
+    .txt-contador-resultados {
+      margin-left: 0;
+      white-space: normal;
+    }
+    .status-carregamento-dinamico {
+      margin-left: 0;
+      align-self: flex-start;
     }
     .busca-sala-wrapper, .input-busca, .busca-sugestoes-popover {
       width: 100%;
@@ -1732,19 +1822,6 @@
     }
     .sugestoes-acoes-grid::-webkit-scrollbar {
       display: none;
-    }
-    .barra-resultados {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 3px;
-    }
-    .barra-resultados.carregando-dinamico #txt-contador-resultados {
-      max-width: 100%;
-    }
-    .status-carregamento-dinamico {
-      position: static;
-      transform: none;
-      align-self: center;
     }
   }
 
@@ -1835,37 +1912,6 @@
     margin-left: 4px;
   }
 
-  /* --------------------------------------------------------------------------
-     Rodapé e Badge de Versão
-     -------------------------------------------------------------------------- */
-  .app-footer {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 16px;
-    font-size: 11px;
-    color: var(--text-muted);
-    background: #f8fafc;
-    border-top: 1px solid var(--border);
-    text-align: center;
-  }
-
-  .badge-versao {
-    display: inline-flex;
-    align-items: center;
-    padding: 1px 6px;
-    margin: 0 3px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #1e3a8a;
-    background: #e0e7ff;
-    border: 1px solid #c7d2fe;
-    border-radius: 9999px;
-    letter-spacing: 0.2px;
-  }
   /* --------------------------------------------------------------------------
      Modal / Card Elegante de Informações da Disciplina (Jupiterweb)
      -------------------------------------------------------------------------- */
