@@ -69,6 +69,11 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.5.2:** Otimização dos Atalhos Rápidos da Busca & Botão Limpar Filtros:
+  - Substituição do atalho "Salas Livres" pelo atalho "Limpar Filtros" (`🧹 Limpar Filtros`) nos chips rápidos de busca quando o campo está vazio;
+  - Posicionamento no canto direito do container de atalhos rápidos via alinhamento CSS flexbox (`margin-left: auto`), com estilo sutil e feedback tátil no hover e navegação por teclado (`.chip-acao-direita`);
+  - Invocação da rotina canônica `resetarTodosFiltros()` ao acionar o chip de limpeza;
+  - Atualização da suíte de testes unitários em `tests/test_autocomplete_logic.py` cobrindo a nova estrutura de ações rápidas (100% de sucesso nos 83 testes).
 - [x] **v1.5.1:** Chips da Busca Baseados Exclusivamente na Grade Atual & Resiliência do Estado Vazio:
   - Eliminação completa de listas semente estáticas (`DOCENTES_SEMENTE` e `DISCIPLINAS_SEMENTE`); índices de busca são derivados 100% da grade alocada no momento;
   - Extração canônica e unificada de turmas (`extrairTurmasNumericasDaCelula`) compartilhada entre indexação e filtragem de busca (DRY);

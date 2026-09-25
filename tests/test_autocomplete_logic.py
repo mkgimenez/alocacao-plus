@@ -388,9 +388,9 @@ class AutocompleteEngine:
                 "disciplinas": [],
                 "docentes": [],
                 "acoesRapidas": [
-                    {"rotulo": "🚪 Salas Livres", "acao": "livres"},
                     {"rotulo": "⚡ Horário de Agora", "acao": "agora"},
-                    {"rotulo": "⚡ Focar em Hoje", "acao": "hoje"}
+                    {"rotulo": "⚡ Focar em Hoje", "acao": "hoje"},
+                    {"rotulo": "🧹 Limpar Filtros", "acao": "limpar", "alinharDireita": True}
                 ]
             }
 
@@ -623,6 +623,11 @@ class TestAutocompleteLogic(unittest.TestCase):
         res = self.engine.buscar_sugestoes("")
         self.assertTrue(res["ehVazio"])
         self.assertEqual(len(res["acoesRapidas"]), 3)
+        acoes = [a["acao"] for a in res["acoesRapidas"]]
+        self.assertEqual(acoes, ["agora", "hoje", "limpar"])
+        self.assertNotIn("livres", acoes)
+        limpar_item = next(a for a in res["acoesRapidas"] if a["acao"] == "limpar")
+        self.assertTrue(limpar_item.get("alinharDireita"))
         self.assertGreaterEqual(len(res["departamentos"]), 4)
         self.assertEqual(len(res["disciplinas"]), 0)
         self.assertEqual(len(res["docentes"]), 0)

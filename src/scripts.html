@@ -1529,9 +1529,9 @@
         disciplinas: [],
         docentes: [],
         acoesRapidas: [
-          { rotulo: '🚪 Salas Livres', acao: 'livres' },
           { rotulo: '⚡ Horário de Agora', acao: 'agora' },
-          { rotulo: '⚡ Focar em Hoje', acao: 'hoje' }
+          { rotulo: '⚡ Focar em Hoje', acao: 'hoje' },
+          { rotulo: '🧹 Limpar Filtros', acao: 'limpar', alinharDireita: true }
         ]
       };
     }
@@ -1663,7 +1663,7 @@
           </div>
           <div class="sugestoes-chips-grid">
             ${res.acoesRapidas.map(a => `
-              <button type="button" class="chip-sugestao chip-acao-rapida" data-valor="${a.acao}" data-tipo="acao">
+              <button type="button" class="chip-sugestao chip-acao-rapida ${a.alinharDireita || a.acao === 'limpar' ? 'chip-acao-direita' : ''}" data-valor="${a.acao}" data-tipo="acao">
                 ${escapeHtml(a.rotulo)}
               </button>
             `).join('')}
@@ -1776,12 +1776,12 @@
   function selecionarSugestao(valor, tipo) {
     if (tipo === 'acao') {
       fecharSugestoesBusca();
-      if (valor === 'livres') {
-        alternarModoApenasLivres();
-      } else if (valor === 'agora') {
+      if (valor === 'agora') {
         selecionarHorarioAgora();
       } else if (valor === 'hoje') {
         selecionarHoje();
+      } else if (valor === 'limpar') {
+        resetarTodosFiltros();
       }
       return;
     }
