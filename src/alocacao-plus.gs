@@ -575,6 +575,72 @@ function parsearHtmlJanusTurma(codigo, html, numTurma) {
     }
   }
 
+  // 6. Número de Vagas (ancorado em intl_numeroVagas ou Número de vagas)
+  let vagas = null;
+  const mVagasBloco = html.match(/(?:intl_numeroVagas|N[uú]mero\s+de\s+[Vv]agas)[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i);
+  if (mVagasBloco) {
+    const tabelaConteudo = mVagasBloco[1];
+    const reTr = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const linhasTr = [];
+    let mTr;
+    while ((mTr = reTr.exec(tabelaConteudo)) !== null) {
+      linhasTr.push(mTr[1]);
+    }
+
+    if (linhasTr.length > 0) {
+      let idxTotal = -1;
+      const reTdCab = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+      const tdsCab = [];
+      let mTd;
+      while ((mTd = reTdCab.exec(linhasTr[0])) !== null) {
+        tdsCab.push(mTd[1]);
+      }
+
+      for (let idx = 0; idx < tdsCab.length; idx++) {
+        const textoCab = decodificarEntidadesHtml(tdsCab[idx].replace(/<[^>]+>/g, ' ')).trim();
+        if (/total/i.test(textoCab) || tdsCab[idx].toLowerCase().includes('intl_total')) {
+          idxTotal = idx;
+          break;
+        }
+      }
+
+      if (idxTotal === -1 && tdsCab.length > 0) {
+        idxTotal = tdsCab.length - 1;
+      }
+
+      for (let r = 1; r < linhasTr.length; r++) {
+        const reTdDados = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+        const tdsDados = [];
+        let mVal;
+        while ((mVal = reTdDados.exec(linhasTr[r])) !== null) {
+          tdsDados.push(mVal[1]);
+        }
+        if (tdsDados.length === 0) continue;
+
+        if (idxTotal >= 0 && idxTotal < tdsDados.length) {
+          const valRaw = decodificarEntidadesHtml(tdsDados[idxTotal].replace(/<[^>]+>/g, ' ')).trim();
+          const valLimpo = valRaw.replace(/[^\d]/g, '');
+          if (valLimpo) {
+            vagas = parseInt(valLimpo, 10);
+            break;
+          }
+        }
+
+        if (vagas === null) {
+          for (let c = tdsDados.length - 1; c >= 0; c--) {
+            const valRaw = decodificarEntidadesHtml(tdsDados[c].replace(/<[^>]+>/g, ' ')).trim();
+            const valLimpo = valRaw.replace(/[^\d]/g, '');
+            if (valLimpo) {
+              vagas = parseInt(valLimpo, 10);
+              break;
+            }
+          }
+          if (vagas !== null) break;
+        }
+      }
+    }
+  }
+
   let obs = '';
   if (locaisEncontrados.length > 0) {
     obs = 'Local: ' + locaisEncontrados.sort().join(', ');
@@ -591,7 +657,8 @@ function parsearHtmlJanusTurma(codigo, html, numTurma) {
     docentes: docentes,
     horarios: horarios,
     idioma: idioma,
-    observacoes: obs
+    observacoes: obs,
+    vagas: vagas
   };
 }
 
@@ -732,6 +799,44 @@ function parsearHtmlJupiterweb(codigo, html) {
 
     const docentesLista = docentesSet.size > 0 ? Array.from(docentesSet).sort() : ['A Designar'];
 
+    // Alunos Matriculados (soma apenas das categorias com colspan=2, ignora linhas filhas de unidades)
+    let matriculados = null;
+    const mMatr = chunk.match(/Matriculado/i);
+    if (mMatr) {
+      const posMatr = mMatr.index;
+      const trechoTabela = chunk.substring(posMatr).split(/<\/table>/i)[0];
+      const reTr = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+      let mTr;
+      let totalMatriculados = 0;
+      let teveCategoria = false;
+      while ((mTr = reTr.exec(trechoTabela)) !== null) {
+        const trHtml = mTr[1];
+        const reTd = /<td([^>]*)>([\s\S]*?)<\/td>/gi;
+        const tds = [];
+        let mTd;
+        while ((mTd = reTd.exec(trHtml)) !== null) {
+          tds.push({ attrs: mTd[1], html: mTd[2] });
+        }
+        if (tds.length === 5) {
+          if (/colspan\s*=\s*['"]?\s*2\s*['"]?/i.test(tds[0].attrs)) {
+            const catTexto = decodificarEntidadesHtml(tds[0].html.replace(/<[^>]+>/g, ' ')).trim();
+            const catLower = catTexto.toLowerCase();
+            if (catTexto && catLower !== 'vagas' && catLower !== 'matriculados' && catLower !== 'inscritos' && catLower !== 'pendentes') {
+              teveCategoria = true;
+              const valRaw = decodificarEntidadesHtml(tds[4].html.replace(/<[^>]+>/g, ' ')).trim();
+              const valLimpo = valRaw.replace(/[^\d]/g, '');
+              if (valLimpo) {
+                totalMatriculados += parseInt(valLimpo, 10);
+              }
+            }
+          }
+        }
+      }
+      if (teveCategoria) {
+        matriculados = totalMatriculados;
+      }
+    }
+
     turmas[numTurma] = {
       codigoTurma: codTurma,
       numero: numTurma,
@@ -741,7 +846,8 @@ function parsearHtmlJupiterweb(codigo, html) {
       fim: fim,
       docentes: docentesLista,
       horarios: horarios,
-      observacoes: observacoes
+      observacoes: observacoes,
+      matriculados: matriculados
     };
   }
 
@@ -1207,8 +1313,8 @@ function obterDadosGradeWeb(forcarAtualizacao) {
     // Se for atualização forçada, invalida também o cache do Jupiterweb e Janus no ScriptCache
     if (forcarAtualizacao && (codigosGraduacaoEncontrados.size > 0 || codigosPosEncontrados.size > 0)) {
       try {
-        const PREFIXO_CACHE_JUPITER = 'JUP_V18_';
-        const PREFIXO_CACHE_JANUS = 'JAN_V2_';
+        const PREFIXO_CACHE_JUPITER = 'JUP_V19_';
+        const PREFIXO_CACHE_JANUS = 'JAN_V3_';
         const chavesParaRemover = [
           ...Array.from(codigosGraduacaoEncontrados).map(c => PREFIXO_CACHE_JUPITER + c),
           ...Array.from(codigosPosEncontrados).map(c => 'JAN_V1_' + c),
@@ -1302,8 +1408,8 @@ function obterLoteDisciplinas(listaCodigos) {
     }
 
     const cache = CacheService.getScriptCache();
-    const PREFIXO_CACHE_JUPITER = 'JUP_V18_';
-    const PREFIXO_CACHE_JANUS = 'JAN_V2_';
+    const PREFIXO_CACHE_JUPITER = 'JUP_V19_';
+    const PREFIXO_CACHE_JANUS = 'JAN_V3_';
     const resultado = {};
     const pendentesGrad = [];
     const pendentesPos = [];

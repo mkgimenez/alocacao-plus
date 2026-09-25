@@ -140,9 +140,24 @@ const REGEX_LINHA_HORARIO = /<tr>\s*<td[^>]*><font[^>]*>\s*(Segunda|Terça|Quart
 
 ---
 
-## 5. Extração da Distribuição de Vagas (Dispensada)
+## 5. Extração de Alunos Matriculados por Turma
 
-> 💡 **Nota de Simplificação (Build 15):** A captura, armazenamento e exibição da distribuição de vagas foram removidos do sistema por serem informações dispensáveis para a consulta da grade horária, reduzindo substancialmente o tamanho do JSON trafegado, simplificando o card modal e otimizando o consumo de memória no `CacheService`.
+A partir da versão **v1.6.0**, o sistema extrai o total de alunos matriculados (`matriculados`) de cada turma da Graduação a partir da tabela de distribuição de vagas do Jupiterweb.
+
+### 5.1. Regra Estrutural de Extração (Categorias vs Cursos Subordinados)
+Na tabela de distribuição de vagas do Jupiterweb, cada turma pode ter múltiplos tipos de vagas organizados hierarquicamente:
+- **Linhas de Categoria:** Possuem `colspan="2"` (ou `colspan=2`) na primeira célula e totalizam **5 células `<td>`**. A 4ª célula (índice 3) contém o valor de matriculados daquela categoria (ex: *Obrigatória*, *Optativa Eletiva*, *Optativa Livre*, *Extra-Curricular*).
+- **Linhas de Cursos Subordinados:** Detalham as vagas por código de curso (ex: *18025 - Eng. Mecânica*) e possuem **6 células `<td>`**, sem `colspan`.
+- **Delimitação Estrita:** O parser ancora na palavra `Matriculado` no cabeçalho da tabela e delimita o processamento estritamente até a tag de fechamento `</table>` mais próxima, prevenindo contaminação por tabelas subsequentes da página.
+
+### 5.2. Algoritmo de Soma
+Para evitar dupla contagem, o parser:
+1. Divide o trecho em linhas `<tr>...</tr>`;
+2. Identifica apenas as linhas com `colspan\s*=\s*['"]?2['"]?` (linhas de categoria com 5 células);
+3. Extrai o número inteiro da 4ª célula (`td[3]`) e o acumula na contagem total de `matriculados`;
+4. Ignora explicitamente todas as linhas de cursos subordinados (6 células).
+
+Se a tabela de vagas for encontrada no HTML, o campo `matriculados` é preenchido com a soma inteira ($\ge 0$). Caso a tabela não esteja presente no HTML, o campo é retornado como `null` / ausente (sinalizando *"Não informado"* na UI).
 
 ---
 
@@ -226,6 +241,7 @@ Para cada disciplina consultada, o backend produz e armazena em cache o seguinte
         { "dia": "Segunda", "inicio": "08:00", "fim": "10:00", "docente": "Ana Claudia Nabarro" },
         { "dia": "Quarta", "inicio": "10:00", "fim": "12:00", "docente": "Ana Claudia Nabarro" }
       ],
+      "matriculados": 42,
       "observacoes": ""
     }
   }

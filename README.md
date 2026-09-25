@@ -31,7 +31,7 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
 - **🔗 Integração e Enriquecimento com Portais Acadêmicos da USP:**
   - **Graduação (Jupiterweb) & Pós-Graduação (Janus):** Enriquecimento progressivo assíncrono em segundo plano (*background worker* com 0ms de impacto no tempo de carga da grade):
     - **No Hover:** Exibe o nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`) e informações de oferecimento.
-    - **No Clique:** Abre instantaneamente o **Card Modal Elegante** com estado de carregamento (*skeleton shimmer*), seleção de turmas por pills, horários oficiais, distribuição de vagas, docentes e observações.
+    - **No Clique:** Abre instantaneamente o **Card Modal Elegante** com estado de carregamento (*skeleton shimmer*), seleção de turmas por pills, horários oficiais, contagem de alunos matriculados (Graduação) ou vagas oferecidas (Pós-Graduação), docentes e observações.
     - **Acesso Externo:** Botões dedicados no rodapé do modal ("*Abrir no Jupiterweb ↗*" / "*Abrir no Janus ↗*") para consulta direta aos portais oficiais em nova aba.
 - **⚙️ Parametrização sem Código:** A equipe acadêmica pode alternar IDs de planilhas e tempos de cache via aba `_Config` sem tocar no código-fonte.
 
@@ -172,7 +172,7 @@ O projeto conta com uma suíte de testes unitários e testes baseados em proprie
 python tests/run_all_tests.py
 ```
 
-- **Cobertura Completa (72 testes):** Parsers HTML do Jupiterweb e Janus (Pós-Graduação), coloração progressiva, fila prioritária com Viewport 2D, reordenação em scroll, autocomplete semântico, casamento de turmas complexas (`T1`, `T1 e T2`, `pv/tv`, eventos) e controle estrito de concorrência (1 requisição simultânea em voo).
+- **Cobertura Completa (95 testes):** Parsers HTML do Jupiterweb e Janus (Pós-Graduação), formatadores do card modal (alunos matriculados e vagas), coloração progressiva, fila prioritária com Viewport 2D, reordenação em scroll, autocomplete semântico, casamento de turmas complexas (`T1`, `T1 e T2`, `pv/tv`, eventos) e controle estrito de concorrência (1 requisição simultânea em voo).
 - **Resiliência e Estabilidade:** Mais de 3.700 iterações estocásticas de fuzzing para garantir imunidade a HTMLs corrompidos, variações de layout, falhas de rede e picos de concorrência.
 
 ---

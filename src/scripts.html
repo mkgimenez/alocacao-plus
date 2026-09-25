@@ -2274,8 +2274,8 @@
   let jupiterTimerPausa = null;
   let jupiterTimerDebounceScroll = null;
   let timerEsconderProgressoDinamico = null;
-  const PREFIXO_STORAGE_JUPITER = 'alocacao_jupiter_v18_';
-  const PREFIXO_STORAGE_JANUS = 'alocacao_janus_v2_';
+  const PREFIXO_STORAGE_JUPITER = 'alocacao_jupiter_v19_';
+  const PREFIXO_STORAGE_JANUS = 'alocacao_janus_v3_';
 
   function obterPrefixoStorage(cod) {
     return /^[A-Za-z]{3}[1-9]\d{3}$/i.test(cod) ? PREFIXO_STORAGE_JANUS : PREFIXO_STORAGE_JUPITER;
@@ -3553,6 +3553,22 @@
         elHorarios.innerHTML = htmlH;
       } else {
         elHorarios.innerHTML = '<div class="horario-slot-item"><span class="horario-dia-hora">Horários a definir</span></div>';
+      }
+    }
+
+    // Número de Alunos Matriculados (Graduação) / Número de Vagas (Pós-Graduação)
+    const elAlunosContainer = document.getElementById('modal-turma-alunos-container');
+    const elAlunosTitulo = document.getElementById('modal-turma-alunos-titulo');
+    const elAlunosValor = document.getElementById('modal-turma-alunos-valor');
+    if (elAlunosContainer && elAlunosValor) {
+      if (ehPos) {
+        if (elAlunosTitulo) elAlunosTitulo.textContent = '👥 Número de Vagas';
+        const temVagas = turmaObj.vagas !== undefined && turmaObj.vagas !== null;
+        elAlunosValor.textContent = temVagas ? String(turmaObj.vagas) : 'Não informado';
+      } else {
+        if (elAlunosTitulo) elAlunosTitulo.textContent = '👥 Alunos Matriculados';
+        const temMatr = turmaObj.matriculados !== undefined && turmaObj.matriculados !== null;
+        elAlunosValor.textContent = temMatr ? String(turmaObj.matriculados) : 'Não informado';
       }
     }
 

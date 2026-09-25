@@ -153,6 +153,29 @@ def parsear_html_jupiterweb(codigo, html):
             except Exception:
                 pass
 
+        # Alunos Matriculados (soma apenas das categorias com colspan=2, ignora linhas filhas)
+        matriculados = None
+        m_matr = re.search(r'Matriculado', chunk, re.I)
+        if m_matr:
+            trecho_tabela = re.split(r'</table>', chunk[m_matr.start():], flags=re.I)[0]
+            linhas_tr = re.findall(r'<tr[^>]*>([\s\S]*?)</tr>', trecho_tabela, re.I)
+            total_matriculados = 0
+            teve_categoria = False
+            for tr in linhas_tr:
+                tds = re.findall(r'<td([^>]*)>([\s\S]*?)</td>', tr, re.I)
+                if len(tds) == 5:
+                    attrs_td0 = tds[0][0]
+                    if re.search(r'colspan\s*=\s*[\'"]?\s*2\s*[\'"]?', attrs_td0, re.I):
+                        cat_texto = decodificar_entidades(re.sub(r'<[^>]+>', ' ', tds[0][1])).strip()
+                        if cat_texto and cat_texto.lower() not in ("vagas", "matriculados", "inscritos", "pendentes"):
+                            teve_categoria = True
+                            val_raw = decodificar_entidades(re.sub(r'<[^>]+>', ' ', tds[4][1])).strip()
+                            val_limpo = re.sub(r'[^\d]', '', val_raw)
+                            if val_limpo:
+                                total_matriculados += int(val_limpo)
+            if teve_categoria:
+                matriculados = total_matriculados
+
         turmas[num_turma] = {
             "codigoTurma": cod_turma,
             "numero": num_turma,
@@ -162,7 +185,8 @@ def parsear_html_jupiterweb(codigo, html):
             "fim": fim,
             "docentes": docentes_lista,
             "horarios": horarios,
-            "observacoes": observacoes
+            "observacoes": observacoes,
+            "matriculados": matriculados
         }
 
     return {
@@ -217,6 +241,10 @@ class TestJupiterParser(unittest.TestCase):
         self.assertIn("Lucas Brandão Monteiro de Assis", h.get("professores", []))
         self.assertIn("Paulo Cesar Lima Segantine", h.get("professores", []))
 
+        # Matriculados STT0410
+        self.assertEqual(dados["turmas"]["01"]["matriculados"], 33)
+        self.assertEqual(t2["matriculados"], 34)
+
     def test_parse_disciplina_sma0356(self):
         """Valida extração completa da disciplina SMA0356 (9 turmas)."""
         dados = parsear_html_jupiterweb("SMA0356", self.html_sma0356)
@@ -236,6 +264,14 @@ class TestJupiterParser(unittest.TestCase):
         self.assertIn("Ana Claudia Nabarro", t1["docentes"])
         self.assertTrue(len(t1["horarios"]) >= 2)
         self.assertNotIn("vagas", t1)
+        # Matriculados: Obrigatória (8) + Optativa Eletiva (5) + Optativa Livre (2) = 15
+        self.assertEqual(t1["matriculados"], 15)
+
+        # Turma 02: Obrigatória (59) + Optativa Eletiva (8) + Optativa Livre (2) = 69
+        self.assertEqual(dados["turmas"]["02"]["matriculados"], 69)
+
+        # Turma 07: Obrigatória (30) + Alunos Especiais (1 com hífen em pendentes) = 31
+        self.assertEqual(dados["turmas"]["07"]["matriculados"], 31)
 
     def test_parse_disciplina_7600006_numerica(self):
         """Valida extração de código puramente numérico 7600006 (8 turmas)."""
@@ -246,6 +282,68 @@ class TestJupiterParser(unittest.TestCase):
         self.assertFalse(dados["semOferecimento"])
         self.assertEqual(len(dados["turmas"]), 8)
         self.assertIn("01", dados["turmas"])
+
+        # Turma 04: Obrigatória (108) + Optativa Livre (1) = 109
+        self.assertEqual(dados["turmas"]["04"]["matriculados"], 109)
+        # Turma 06: Obrigatória (39) + Alunos Especiais (1) = 40
+        self.assertEqual(dados["turmas"]["06"]["matriculados"], 40)
+
+    def test_parse_matriculados_exemplo_sintetico(self):
+        """Valida o caso de teste exato do usuário: categorias somadas e linhas subordinadas ignoradas."""
+        html_sintetico = """
+        <b>SMA0356 - Cálculo IV</b>
+        Código da Turma: <td nowrap>2026201</td>
+        <table border="0">
+          <tr bgcolor="#658CCF">
+            <td colspan="2">&nbsp;</td>
+            <td>Vagas</td><td>Inscritos</td><td>Pendentes</td><td>Matriculados</td>
+          </tr>
+          <tr>
+            <td colspan="2">Obrigatória</td><td>70</td><td>65</td><td>0</td><td>65</td>
+          </tr>
+          <tr>
+            <td width="28">&nbsp;&nbsp;&nbsp;</td><td>EESC - Engenharia Mecânica</td>
+            <td>60</td><td>60</td><td>0</td><td>60</td>
+          </tr>
+          <tr>
+            <td colspan="2">Optativa Livre</td><td>2</td><td>1</td><td>0</td><td>1</td>
+          </tr>
+          <tr>
+            <td width="28">&nbsp;&nbsp;&nbsp;</td><td>Qualquer Unidade da USP</td>
+            <td>2</td><td>0</td><td>0</td><td>0</td>
+          </tr>
+          <tr>
+            <td colspan="2">Extracurricular</td><td>1</td><td>1</td><td>0</td><td>1</td>
+          </tr>
+        </table>
+        """
+        dados = parsear_html_jupiterweb("SMA0356", html_sintetico)
+        self.assertIn("01", dados["turmas"])
+        # Obrigatória (65) + Optativa Livre (1) + Extracurricular (1) = 67
+        self.assertEqual(dados["turmas"]["01"]["matriculados"], 67)
+
+    def test_parse_matriculados_zero_e_ausente(self):
+        """Valida distinção entre turma com 0 alunos e HTML sem tabela de matriculados."""
+        # 1. Turma com tabela e 0 matriculados
+        html_zero = """
+        <b>MAT0100 - Introdução</b>
+        Código da Turma: <td>2026101</td>
+        <table>
+          <tr><td colspan="2">&nbsp;</td><td>Vagas</td><td>Inscritos</td><td>Pendentes</td><td>Matriculados</td></tr>
+          <tr><td colspan="2">Obrigatória</td><td>30</td><td>0</td><td>0</td><td>0</td></tr>
+        </table>
+        """
+        dados_zero = parsear_html_jupiterweb("MAT0100", html_zero)
+        self.assertEqual(dados_zero["turmas"]["01"]["matriculados"], 0)
+
+        # 2. Turma sem tabela de matriculados
+        html_sem_tab = """
+        <b>MAT0100 - Introdução</b>
+        Código da Turma: <td>2026102</td>
+        <div>Sem dados de vagas</div>
+        """
+        dados_sem_tab = parsear_html_jupiterweb("MAT0100", html_sem_tab)
+        self.assertIsNone(dados_sem_tab["turmas"]["02"]["matriculados"])
 
     def test_parse_sem_oferecimento(self):
         """Valida detecção de página sem oferecimento ativo (cache negativo)."""

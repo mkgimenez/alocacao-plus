@@ -150,6 +150,29 @@ Na tabela de resultados de `DisciplinaAux`:
   - Coluna 2: Horário de início e término (`08:00 - 11:00`);
   - Coluna 3: Local de aula (`Engenharia de Produção` ou `sala de aula`). Espaços excedentes são limpos via `.trim()`.
 
+### 5.5. Tabela de Vagas Oferecidas
+A partir da versão **v1.6.0**, o parser do Janus captura a quantidade total de vagas oferecidas (`vagas`) para cada turma da Pós-Graduação.
+* **Padrão Encontrado:** Tabela identificada por `intl_numeroVagas` ou texto `Número de vagas`:
+  ```html
+  <span class='label intl_numeroVagas'></span>
+  <table ...>
+    <tr>
+      <td ...><span class='label intl_regulares'></span></td>
+      <td ...><span class='label intl_especiais'></span></td>
+      <td ...><span class='label intl_total'></span></td>
+    </tr>
+    <tr>
+      <td align="right">20</td>
+      <td align="right">5</td>
+      <td align="right">25</td>
+    </tr>
+  </table>
+  ```
+* **Mapeamento Dinâmico de Coluna:**
+  - O parser mapeia dinamicamente os cabeçalhos procurando por `intl_total` ou `total` para determinar o índice correto da coluna (geralmente a 3ª coluna, índice 2);
+  - Extrai o valor numérico inteiro da linha de dados subsequente correspondente a essa coluna;
+  - Se a tabela estiver presente, retorna o inteiro ($\ge 0$); caso contrário, retorna `null`.
+
 ---
 
 ## 6. Schema JSON Unificado
@@ -190,6 +213,7 @@ O resultado é integrado ao schema canônico do Alocação Plus com indexação 
           "local": "Engenharia de Produção"
         }
       ],
+      "vagas": 25,
       "observacoes": "Local: Engenharia de Produção"
     }
   }

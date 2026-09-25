@@ -213,6 +213,45 @@ def parsear_html_janus_turma(codigo, html, num_turma="1"):
         elif raw_id:
             idioma = raw_id
 
+    # 6. Número de Vagas (ancorado em intl_numeroVagas ou Número de vagas)
+    vagas = None
+    m_vagas_bloco = re.search(r"(?:intl_numeroVagas|N[uú]mero\s+de\s+[Vv]agas)[\s\S]*?<table[^>]*>([\s\S]*?)</table>", html, re.I)
+    if m_vagas_bloco:
+        tabela_conteudo = m_vagas_bloco.group(1)
+        linhas_tr = re.findall(r"<tr[^>]*>([\s\S]*?)</tr>", tabela_conteudo, re.I)
+        if linhas_tr:
+            # Analisa cabeçalho procurando coluna 'Total'
+            idx_total = -1
+            tds_cab = re.findall(r"<td[^>]*>([\s\S]*?)</td>", linhas_tr[0], re.I)
+            for idx, c in enumerate(tds_cab):
+                texto_cab = decodificar_entidades(re.sub(r"<[^>]+>", " ", c)).strip()
+                if re.search(r"total", texto_cab, re.I) or "intl_total" in c.lower():
+                    idx_total = idx
+                    break
+
+            if idx_total == -1 and tds_cab:
+                idx_total = len(tds_cab) - 1
+
+            for tr in linhas_tr[1:]:
+                tds_dados = re.findall(r"<td[^>]*>([\s\S]*?)</td>", tr, re.I)
+                if not tds_dados:
+                    continue
+                if 0 <= idx_total < len(tds_dados):
+                    val_raw = decodificar_entidades(re.sub(r"<[^>]+>", " ", tds_dados[idx_total])).strip()
+                    val_limpo = re.sub(r"[^\d]", "", val_raw)
+                    if val_limpo:
+                        vagas = int(val_limpo)
+                        break
+                if vagas is None:
+                    for td in reversed(tds_dados):
+                        val_raw = decodificar_entidades(re.sub(r"<[^>]+>", " ", td)).strip()
+                        val_limpo = re.sub(r"[^\d]", "", val_raw)
+                        if val_limpo:
+                            vagas = int(val_limpo)
+                            break
+                    if vagas is not None:
+                        break
+
     # Observações
     obs = ""
     if locais_encontrados:
@@ -229,7 +268,8 @@ def parsear_html_janus_turma(codigo, html, num_turma="1"):
         "docentes": docentes,
         "horarios": horarios,
         "idioma": idioma,
-        "observacoes": obs
+        "observacoes": obs,
+        "vagas": vagas
     }
 
 
@@ -295,12 +335,14 @@ class TestJanusParser(unittest.TestCase):
         self.assertEqual(info_turma["horarios"][0]["local"], "Engenharia de Produção")
         self.assertEqual(info_turma["idioma"], "Português")
         self.assertEqual(info_turma["observacoes"], "Local: Engenharia de Produção")
+        self.assertEqual(info_turma["vagas"], 15)
 
         # Objeto unificado
         obj_completo = montar_objeto_janus("SEP5864", info_disc, {"1": info_turma})
         self.assertEqual(obj_completo["sistema"], "janus")
         self.assertIn("01", obj_completo["turmas"])
         self.assertNotIn("1", obj_completo["turmas"])  # Chaves canônicas com 2 dígitos
+        self.assertEqual(obj_completo["turmas"]["01"]["vagas"], 15)
 
     def test_disciplina_shs5991_com_travessao(self):
         """Valida SHS5991 com travessão tipográfico e local 'sala de aula'."""
@@ -323,6 +365,7 @@ class TestJanusParser(unittest.TestCase):
         self.assertEqual(info_turma["horarios"][0]["inicio"], "08:30")
         self.assertEqual(info_turma["horarios"][0]["fim"], "12:30")
         self.assertEqual(info_turma["horarios"][0]["local"], "sala de aula")
+        self.assertEqual(info_turma["vagas"], 25)
 
     def test_disciplina_sem5900_sem_oferecimento(self):
         """Valida disciplina sem oferecimento no semestre (SEM5900)."""
@@ -344,6 +387,57 @@ class TestJanusParser(unittest.TestCase):
         self.assertEqual(info_turma["numero"], "04")
         self.assertEqual(info_turma["codigoTurma"], "SHS5934-4")
         self.assertEqual(info_turma["idioma"], "Inglês")
+        self.assertEqual(info_turma["vagas"], 25)
+
+    def test_parse_vagas_exemplo_sintetico(self):
+        """Valida o exemplo exato do usuário: Regulares (20) + Especiais (5) + Total (25) = 25 vagas."""
+        html_sintetico = """
+        <span class='label intl_numeroVagas'></span>:
+        <table>
+          <tr>
+            <td><span class='label intl_alunosRegulares'></span></td>
+            <td><span class='label intl_alunosEspeciais'></span></td>
+            <td>Total</td>
+          </tr>
+          <tr>
+            <td>20</td>
+            <td>5</td>
+            <td>25</td>
+          </tr>
+        </table>
+        """
+        info = parsear_html_janus_turma("TESTE01", html_sintetico, "1")
+        self.assertIsNotNone(info)
+        self.assertEqual(info["vagas"], 25)
+
+    def test_parse_vagas_sem_cabecalho_total_e_zero(self):
+        """Valida fallback quando cabeçalho não tem Total, turma com 0 vagas e HTML sem tabela."""
+        # 1. Fallback quando o cabeçalho não tem a palavra 'Total'
+        html_sem_texto = """
+        <span class='label intl_numeroVagas'></span>
+        <table>
+          <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+          <tr><td>10</td><td>5</td><td>15</td></tr>
+        </table>
+        """
+        info_fallback = parsear_html_janus_turma("TESTE02", html_sem_texto, "1")
+        self.assertEqual(info_fallback["vagas"], 15)
+
+        # 2. Turma com 0 vagas
+        html_zero = """
+        Número de vagas:
+        <table>
+          <tr><td>Total</td></tr>
+          <tr><td>0</td></tr>
+        </table>
+        """
+        info_zero = parsear_html_janus_turma("TESTE03", html_zero, "1")
+        self.assertEqual(info_zero["vagas"], 0)
+
+        # 3. Sem tabela de vagas
+        html_sem_vagas = "<div>Turma sem número de vagas</div>"
+        info_sem = parsear_html_janus_turma("TESTE04", html_sem_vagas, "1")
+        self.assertIsNone(info_sem["vagas"])
 
     def test_property_fuzzing_estabilidade(self):
         """Fuzzing com 200 documentos aleatórios e corrompidos garantindo 0 exceções."""

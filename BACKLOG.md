@@ -69,6 +69,14 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.6.0:** Exibição de Alunos Matriculados (Graduação/Jupiterweb) e Vagas Oferecidas (Pós-Graduação/Janus) no Card Modal da Grade:
+  - **Graduação (Jupiterweb):** Extração robusta no backend de contagem de alunos matriculados (`matriculados`) somando as categorias da tabela de distribuição de vagas (`colspan=2`, 5 células) e ignorando linhas subordinadas de cursos (6 células), com delimitação estrita entre `Matriculado` e `</table>`;
+  - **Pós-Graduação (Janus):** Extração resiliente de vagas oferecidas (`vagas`) a partir da tabela de vagas (`intl_numeroVagas` / `Número de vagas`) no endpoint `TurmaDet`, mapeando dinamicamente o índice da coluna `Total`;
+  - **Exibição Dinâmica no Card Modal:** Apresentação contextual entre `👥 Alunos Matriculados: [N]` (Graduação) e `👥 Número de Vagas: [N]` (Pós-Graduação) ao selecionar turmas por pills, com proteção estrita contra bugs de valores falsy (`0` válido) e fallback elegante para `"Não informado"`;
+  - **Interface e Acessibilidade:** Estilização com tipografia tabular (`font-variant-numeric: tabular-nums`) e container semântico com leitor de tela reativo (`aria-live="polite"`);
+  - **Invalidação e Isolamento de Cache:** Atualização de prefixos de cache do servidor (`JUP_V19_` e `JAN_V3_`) e do cliente (`alocacao_jupiter_v19_` e `alocacao_janus_v3_`), garantindo purga automática de dados legados no `sessionStorage` e no `CacheService`;
+  - **Qualidade & Testes:** Criação da suíte `tests/test_modal_formatters.py` e atualização de testes em `test_jupiter_parser.py`, `test_janus_parser.py` e `test_lote_disciplinas.py`, totalizando 95 testes automatizados (100% de sucesso);
+  - **Governança Arquitetural:** Documentado no ADR 0020.
 - [x] **v1.5.4:** Otimização de Espaço Vertical, Camadas Sticky da Grade & Refinamento do Cabeçalho:
   - **Camadas Sticky no Scroll Horizontal (`z-index`):** Correção do deslizamento dos cabeçalhos de dias da semana (`.th-dia-header` com `z-index: 25`), que agora passam sob os cabeçalhos fixos de Salas e Lugares (`th.col-fixa-sala` e `th.col-fixa-cap` elevados para `z-index: 35 !important`), eliminando sobreposição visual indesejada;
   - **Refatoração do Botão "Atualizar Dados":** Estilo limpo e harmonizado com o design system via classe `.btn-header-recarregar`, com fundo consistente em outline institucional e micro-interação tátil suave;

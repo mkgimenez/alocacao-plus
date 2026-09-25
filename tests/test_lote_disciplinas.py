@@ -55,8 +55,8 @@ def obter_lote_disciplinas_simulado(lista_codigos, cache, provedor_http):
     if not codigos_validos:
         return {"sucesso": True, "dados": {}}
 
-    PREFIXO_JUPITER = "JUP_V18_"
-    PREFIXO_JANUS = "JAN_V1_"
+    PREFIXO_JUPITER = "JUP_V19_"
+    PREFIXO_JANUS = "JAN_V3_"
     resultado = {}
     pendentes_grad = []
     pendentes_pos = []
@@ -169,7 +169,7 @@ class TestLoteDisciplinas(unittest.TestCase):
         for nome in [
             "janus_SEP5864_disciplina.html", "janus_SEP5864_TurmaDet.html",
             "janus_SHS5991_disciplina.html", "janus_SHS5991_TurmaDet.html",
-            "janus_SEM5900_disciplina.html", "jupiter_SMA0356_disciplina.html"
+            "janus_SEM5900_disciplina.html", "jupiter_sma0356.html"
         ]:
             p = os.path.join(dir_fixtures, nome)
             if os.path.exists(p):
@@ -180,7 +180,7 @@ class TestLoteDisciplinas(unittest.TestCase):
 
     def provedor_mock(self, url):
         if "jupiterweb/obterTurma?sgldis=SMA0356" in url:
-            return 200, self.fixtures.get("jupiter_SMA0356_disciplina.html", "")
+            return 200, self.fixtures.get("jupiter_sma0356.html", "")
         if "janus/DisciplinaAux?tipo=T&sgldis=SEP5864" in url:
             return 200, self.fixtures.get("janus_SEP5864_disciplina.html", "")
         if "janus/TurmaDet?sgldis=SEP5864&ofe=1" in url:
@@ -199,17 +199,22 @@ class TestLoteDisciplinas(unittest.TestCase):
 
         self.assertIn("SMA0356", dados)
         self.assertEqual(dados["SMA0356"]["codigo"], "SMA0356")
+        self.assertIn("01", dados["SMA0356"]["turmas"])
+        self.assertEqual(dados["SMA0356"]["turmas"]["01"]["matriculados"], 15)
 
         self.assertIn("SEP5864", dados)
         self.assertEqual(dados["SEP5864"]["sistema"], "janus")
         self.assertIn("01", dados["SEP5864"]["turmas"])
         self.assertEqual(dados["SEP5864"]["turmas"]["01"]["docentes"], ["Fabio Muller Guerrini"])
+        self.assertEqual(dados["SEP5864"]["turmas"]["01"]["vagas"], 15)
 
-        # Segunda chamada deve atingir o cache
+        # Segunda chamada deve atingir o cache preservando matriculados e vagas
         res_cache = obter_lote_disciplinas_simulado(["SMA0356", "SEP5864"], self.cache, lambda u: (500, "Nao deve chamar"))
         self.assertTrue(res_cache["sucesso"])
         self.assertIn("SMA0356", res_cache["dados"])
+        self.assertEqual(res_cache["dados"]["SMA0356"]["turmas"]["01"]["matriculados"], 15)
         self.assertIn("SEP5864", res_cache["dados"])
+        self.assertEqual(res_cache["dados"]["SEP5864"]["turmas"]["01"]["vagas"], 15)
 
     def test_lote_pos_sem_oferecimento(self):
         """Valida cache negativo de disciplina de pós sem oferecimento (SEM5900)."""
