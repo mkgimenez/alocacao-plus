@@ -154,7 +154,7 @@
           <div class="busca-sala-wrapper" id="busca-sala-wrapper">
             <span class="icone-busca">🔍</span>
             <input type="text" id="input-busca-sala" class="input-busca" placeholder="Buscar disciplina, docente ou texto..." autocomplete="off" spellcheck="false" oninput="aoBuscarSala(this.value)" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="busca-sugestoes-dropdown">
-            <button type="button" id="btn-limpar-busca" class="btn-limpar-busca" style="display: none;" onclick="limparBusca()" title="Limpar busca">&times;</button>
+            <button type="button" id="btn-limpar-busca" class="btn-limpar-busca" style="display: none;" onmousedown="event.preventDefault()" onclick="limparBusca()" title="Limpar busca">&times;</button>
             <!-- Dropdown Flutuante de Autocomplete Inteligente -->
             <div id="busca-sugestoes-dropdown" class="busca-sugestoes-popover" style="display: none;" role="listbox" aria-label="Sugestões de busca"></div>
           </div>

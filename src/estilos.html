@@ -790,26 +790,31 @@
     font-size: 12px;
     border: 1px solid var(--border-dark);
     border-radius: var(--radius-sm);
-    width: 250px;
+    width: 290px;
     outline: none;
-    transition: all 0.2s ease;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
   }
 
   .input-busca:focus {
     border-color: #0070a8;
-    width: 310px;
     box-shadow: 0 0 0 2px rgba(0, 112, 168, 0.2);
   }
 
   .btn-limpar-busca {
     position: absolute;
     right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: var(--text-subtle);
-    font-size: 16px;
+    font-size: 15px;
     cursor: pointer;
-    padding: 0 4px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     line-height: 1;
     border-radius: 50%;
     -webkit-tap-highlight-color: transparent;
@@ -820,11 +825,11 @@
   .btn-limpar-busca:hover {
     color: var(--text-main);
     background: #e2e8f0;
-    transform: scale(1.1);
+    transform: translateY(-50%) scale(1.1);
   }
 
   .btn-limpar-busca:active {
-    transform: scale(0.9);
+    transform: translateY(-50%) scale(0.92);
     transition-duration: 0.05s;
   }
 
@@ -835,8 +840,8 @@
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
-    width: 380px;
-    max-width: 90vw;
+    width: 440px;
+    max-width: min(92vw, 440px);
     background: #ffffff;
     border: 1px solid var(--border-dark);
     border-radius: var(--radius-md);
@@ -904,6 +909,13 @@
   .sugestoes-chips-grid {
     display: flex;
     flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sugestoes-acoes-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 6px;
   }
 
@@ -1024,6 +1036,8 @@
     background: #fefce8;
     border-color: #fde047;
     color: #854d0e;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .chip-sugestao.chip-acao-rapida:hover,
@@ -1711,6 +1725,13 @@
     .busca-sala-wrapper, .input-busca, .busca-sugestoes-popover {
       width: 100%;
       max-width: 100%;
+    }
+    .sugestoes-acoes-grid {
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .sugestoes-acoes-grid::-webkit-scrollbar {
+      display: none;
     }
     .barra-resultados {
       flex-direction: column;

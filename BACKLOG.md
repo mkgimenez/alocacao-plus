@@ -69,6 +69,11 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.5.3:** Estabilização Dimensional da Caixa de Busca & Limpeza ao Primeiro Toque:
+  - Estabilização dimensional definitiva da caixa de busca (`width: 290px;` fixo tanto em repouso quanto em foco), eliminando o salto de 60px (*Cumulative Layout Shift* = 0) e a quebra de alinhamento dos botões vizinhos;
+  - Correção cirúrgica do botão de limpar busca (`×`): prevenção de `blur` prematuro via `onmousedown="event.preventDefault()"`, garantindo execução de `limparBusca()` ao primeiro toque (eliminação da necessidade de duplo clique e do deslocamento do botão sob o cursor);
+  - Refinamento de alinhamento vertical (`top: 50%; transform: translateY(-50%)`) e dimensões ergonômicas de toque (`20x20px`) do botão `×`;
+  - Alinhamento horizontal estrito em linha única dos atalhos rápidos no popover de busca (`.sugestoes-acoes-grid` com `flex-wrap: nowrap`, `white-space: nowrap` e popover expandido para `440px`), garantindo que "Limpar Filtros" permaneça alinhado à direita na mesma linha que "Horário de Agora" e "Focar em Hoje".
 - [x] **v1.5.2:** Otimização dos Atalhos Rápidos da Busca & Botão Limpar Filtros:
   - Substituição do atalho "Salas Livres" pelo atalho "Limpar Filtros" (`🧹 Limpar Filtros`) nos chips rápidos de busca quando o campo está vazio;
   - Posicionamento no canto direito do container de atalhos rápidos via alinhamento CSS flexbox (`margin-left: auto`), com estilo sutil e feedback tátil no hover e navegação por teclado (`.chip-acao-direita`);

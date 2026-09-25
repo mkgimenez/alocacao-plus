@@ -1661,7 +1661,7 @@
           <div class="sugestoes-secao-header">
             <span class="sugestoes-secao-titulo"><span>⚡</span> Atalhos Rápidos</span>
           </div>
-          <div class="sugestoes-chips-grid">
+          <div class="sugestoes-chips-grid sugestoes-acoes-grid">
             ${res.acoesRapidas.map(a => `
               <button type="button" class="chip-sugestao chip-acao-rapida ${a.alinharDireita || a.acao === 'limpar' ? 'chip-acao-direita' : ''}" data-valor="${a.acao}" data-tipo="acao">
                 ${escapeHtml(a.rotulo)}
