@@ -1,6 +1,6 @@
 ## 📥 Inbox (Captura Rápida)
 
-
+- [ ] Mudar cor das células até que o carregamento esteja completo
 ---
 
 
@@ -42,6 +42,7 @@ flowchart LR
 <!-- Ideias categorizadas para consulta e planejamento estratégico -->
 
 ### 🎨 Interface, UX & Mobile
+- [x] Exibir mensagem centralizada na mesma linha de "Exibindo xx de xx salas" durante o carregamento dinâmico ("Carregando dados do Jupiterweb/Janus: x%") com cor azul marinho idêntica ao fundo do cabeçalho de salas.
 - [ ] Adicionar suporte a Dark Mode respeitando a preferência do sistema operacional (`prefers-color-scheme`).
 - [x] Adicionar micro-animações nas transições dos chips de filtros para feedback tátil mais suave.
 - [ ] Reparar a barra de rolagem da maior janela para que passe a funcionar no mobile

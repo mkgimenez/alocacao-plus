@@ -26,6 +26,7 @@
     jupiterLoteEmVoo: [],
     jupiterCallbacksUrgentes: {},
     jupiterContadorOrdem: 0,
+    _todosCodigosGrade: null,
     _salasVisiveisAtuais: [],
     _slotsAtivosAtuais: []
   };
@@ -215,6 +216,7 @@
 
       const eraRecarregamentoManual = (estadoApp.dadosBrutos !== null);
       estadoApp.dadosBrutos = resposta.dados;
+      estadoApp._todosCodigosGrade = null;
       estadoApp.carregando = false;
 
       // Atualiza label de sincronização
@@ -2024,6 +2026,7 @@
         }
       }
       txtContador.innerHTML = `Exibindo <strong>${salasVisiveis.length}</strong> de ${todasSalas.length} salas • <strong>${slotsAtivos.length}</strong> horários visíveis${infoBusca}.`;
+      txtContador.title = `Exibindo ${salasVisiveis.length} de ${todasSalas.length} salas • ${slotsAtivos.length} horários visíveis${temBusca ? ' • Filtro: ' + buscaLimpa : ''}.`;
     }
 
     const containerTab = document.getElementById('grade-tabela-container');
@@ -2209,11 +2212,137 @@
 
   let jupiterTimerPausa = null;
   let jupiterTimerDebounceScroll = null;
+  let timerEsconderProgressoDinamico = null;
   const PREFIXO_STORAGE_JUPITER = 'alocacao_jupiter_v18_';
   const PREFIXO_STORAGE_JANUS = 'alocacao_janus_v2_';
 
   function obterPrefixoStorage(cod) {
     return /^[A-Za-z]{3}[1-9]\d{3}$/i.test(cod) ? PREFIXO_STORAGE_JANUS : PREFIXO_STORAGE_JUPITER;
+  }
+
+  /**
+   * Obtém a lista de todos os códigos de disciplinas presentes em toda a grade recebida.
+   * Utiliza cache em memória para evitar varreduras desnecessárias da matriz.
+   */
+  function obterTodosCodigosGrade() {
+    if (estadoApp._todosCodigosGrade && estadoApp._todosCodigosGrade.length > 0) {
+      return estadoApp._todosCodigosGrade;
+    }
+    if (!estadoApp.dadosBrutos || !estadoApp.dadosBrutos.grade) return [];
+    const setCodigos = new Set();
+    const matrizGrade = estadoApp.dadosBrutos.grade || [];
+    matrizGrade.forEach(linha => {
+      if (!Array.isArray(linha)) return;
+      linha.forEach(cel => {
+        if (cel && cel.d && Array.isArray(cel.d)) {
+          cel.d.forEach(cod => {
+            const codNorm = String(cod).trim().toUpperCase();
+            if (codNorm) setCodigos.add(codNorm);
+          });
+        }
+      });
+    });
+    estadoApp._todosCodigosGrade = Array.from(setCodigos);
+    return estadoApp._todosCodigosGrade;
+  }
+
+  /**
+   * Atualiza a barra de progresso discreta do carregamento dinâmico em segundo plano (Jupiterweb/Janus)
+   * na barra de resultados, centralizada na mesma linha de "Exibindo xx de xx salas",
+   * com mensagem sem negrito e com itálico.
+   */
+  function atualizarProgressoCarregamentoDinamico() {
+    const elProgresso = document.getElementById('status-carregamento-dinamico');
+    const barraResultados = document.querySelector('.barra-resultados');
+    if (!elProgresso) return;
+
+    let elFill = document.getElementById('barra-progresso-dinamico-fill');
+    if (!elFill) {
+      elProgresso.innerHTML = '<span class="status-carregamento-texto"><i>Carregando dados do Jupiterweb/Janus</i></span>' +
+        '<div class="progresso-dinamico-trilho">' +
+        '<div id="barra-progresso-dinamico-fill" class="progresso-dinamico-barra" style="width: 0%;"></div>' +
+        '</div>';
+      elFill = document.getElementById('barra-progresso-dinamico-fill');
+    }
+
+    const todosCodigos = obterTodosCodigosGrade();
+    const total = todosCodigos.length;
+
+    // Se ainda não há dados ou não existem disciplinas na grade
+    if (total === 0) {
+      elProgresso.style.display = 'none';
+      elProgresso.classList.remove('ocultando');
+      if (elFill) elFill.style.width = '0%';
+      if (barraResultados) barraResultados.classList.remove('carregando-dinamico');
+      return;
+    }
+
+    // Calcula quantas disciplinas já estão no cache (memória ou sessionStorage)
+    let concluidas = 0;
+    for (let i = 0; i < total; i++) {
+      if (obterCacheJupiter(todosCodigos[i])) {
+        concluidas++;
+      }
+    }
+
+    const emExecucao = (estadoApp.filaJupiter && estadoApp.filaJupiter.length > 0) || estadoApp.jupiterRequisicaoEmVoo;
+
+    // Se já concluiu todas as disciplinas
+    if (concluidas >= total) {
+      if (emExecucao) {
+        if (barraResultados) barraResultados.classList.add('carregando-dinamico');
+        elProgresso.classList.remove('ocultando');
+        elProgresso.style.display = 'inline-flex';
+        if (elFill) elFill.style.width = '100%';
+        elProgresso.title = 'Carregamento do Jupiterweb/Janus concluído (100%)';
+        return;
+      }
+
+      // Se concluiu todas e a fila encerrou
+      if (elProgresso.style.display !== 'none') {
+        if (elFill) elFill.style.width = '100%';
+        elProgresso.title = 'Carregamento do Jupiterweb/Janus concluído (100%)';
+        if (timerEsconderProgressoDinamico) clearTimeout(timerEsconderProgressoDinamico);
+        timerEsconderProgressoDinamico = setTimeout(() => {
+          elProgresso.classList.add('ocultando');
+          setTimeout(() => {
+            elProgresso.style.display = 'none';
+            elProgresso.classList.remove('ocultando');
+            if (elFill) elFill.style.width = '0%';
+            if (barraResultados) barraResultados.classList.remove('carregando-dinamico');
+            timerEsconderProgressoDinamico = null;
+          }, 350);
+        }, 1000);
+      } else {
+        elProgresso.style.display = 'none';
+        elProgresso.classList.remove('ocultando');
+        if (elFill) elFill.style.width = '0%';
+        if (barraResultados) barraResultados.classList.remove('carregando-dinamico');
+      }
+      return;
+    }
+
+    // Se a fila esvaziou sem requisição em voo (por exemplo, nenhum lote disparado ainda ou nada pendente)
+    if (!emExecucao) {
+      elProgresso.style.display = 'none';
+      elProgresso.classList.remove('ocultando');
+      if (elFill) elFill.style.width = '0%';
+      if (barraResultados) barraResultados.classList.remove('carregando-dinamico');
+      return;
+    }
+
+    // Carregamento dinâmico ativamente em execução
+    if (timerEsconderProgressoDinamico) {
+      clearTimeout(timerEsconderProgressoDinamico);
+      timerEsconderProgressoDinamico = null;
+    }
+
+    const pct = Math.min(99, Math.floor((concluidas / total) * 100));
+    if (barraResultados) barraResultados.classList.add('carregando-dinamico');
+    elProgresso.classList.remove('ocultando');
+    elProgresso.style.display = 'inline-flex';
+    if (elFill) elFill.style.width = pct + '%';
+    elProgresso.title = `Carregando dados do Jupiterweb/Janus: ${pct}%`;
   }
 
   // Limpeza de caches legados de versões anteriores no sessionStorage
@@ -2306,6 +2435,7 @@
     } catch (e) {
       console.warn('Erro ao limpar sessionStorage:', e);
     }
+    atualizarProgressoCarregamentoDinamico();
   }
 
   function limparCacheLocalJupiter() {
@@ -2537,8 +2667,10 @@
       });
     });
 
+    estadoApp._todosCodigosGrade = todosCodigos;
     atualizarVisibilidadeFilaJupiter(codigosVisiveis, todosCodigos);
     processarFilaJupiter();
+    atualizarProgressoCarregamentoDinamico();
   }
 
   /**
@@ -2547,14 +2679,20 @@
    */
   function processarFilaJupiter() {
     if (estadoApp.jupiterRequisicaoEmVoo) return;
-    if (!estadoApp.filaJupiter || estadoApp.filaJupiter.length === 0) return;
+    if (!estadoApp.filaJupiter || estadoApp.filaJupiter.length === 0) {
+      atualizarProgressoCarregamentoDinamico();
+      return;
+    }
 
     // Descarta do topo códigos que já estejam no cache
     while (estadoApp.filaJupiter.length > 0 && obterCacheJupiter(estadoApp.filaJupiter[0].codigo)) {
       estadoApp.filaJupiter.shift();
     }
 
-    if (estadoApp.filaJupiter.length === 0) return;
+    if (estadoApp.filaJupiter.length === 0) {
+      atualizarProgressoCarregamentoDinamico();
+      return;
+    }
 
     const TAMANHO_LOTE = 3;
     const loteItens = [];
@@ -2575,6 +2713,7 @@
 
     estadoApp.jupiterRequisicaoEmVoo = true;
     estadoApp.jupiterLoteEmVoo = codigosLote;
+    atualizarProgressoCarregamentoDinamico();
 
     // Se estiver em ambiente de teste local sem google.script.run
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
@@ -2650,6 +2789,8 @@
       aplicarFiltrosEAtualizarVisualizacao();
     }
 
+    atualizarProgressoCarregamentoDinamico();
+
     // Pausa de alívio de 250ms antes de disparar o próximo lote
     if (jupiterTimerPausa) clearTimeout(jupiterTimerPausa);
     jupiterTimerPausa = setTimeout(processarFilaJupiter, 250);
@@ -2676,6 +2817,8 @@
         enfileirarJupiter(cod, 2);
       }
     });
+
+    atualizarProgressoCarregamentoDinamico();
 
     // Pausa preventiva de 3s antes de retomar
     if (jupiterTimerPausa) clearTimeout(jupiterTimerPausa);

@@ -208,6 +208,32 @@ class GerenciadorFilaJupiter:
                     pri = 0 if cod in self.callbacks_urgentes else 2
                     self.adicionar(cod, prioridade=pri)
 
+    def calcular_progresso(self, universo_codigos):
+        """
+        Calcula o progresso percentual (0 a 100) do carregamento dinâmico
+        com base no universo de códigos da grade e no estado da fila/cache.
+        Retorna (percentual, em_execucao).
+        """
+        if not universo_codigos:
+            return 0, False
+
+        universo_set = set(c.strip().upper() for c in universo_codigos if c and isinstance(c, str))
+        total = len(universo_set)
+        if total == 0:
+            return 0, False
+
+        concluidas = sum(1 for c in universo_set if c in self.cache)
+        em_execucao = len(self.fila) > 0 or self.em_voo
+
+        if concluidas >= total:
+            return 100, em_execucao
+
+        if not em_execucao:
+            return 0, False
+
+        pct = min(99, int((concluidas / total) * 100))
+        return pct, True
+
 
 class TestQueueLogic(unittest.TestCase):
     """Testes unitários e invariantes da fila de enriquecimento progressivo."""
@@ -365,6 +391,75 @@ class TestQueueLogic(unittest.TestCase):
         self.assertEqual(len(self.gerenciador.fila), 0)
         self.assertEqual(len(self.gerenciador.callbacks_urgentes), 0)
         self.assertEqual(len(self.gerenciador.lote_atual), 0)
+
+    def test_progresso_carregamento_dinamico(self):
+        """Valida a progressão de 0% a 100% durante o ciclo de vida dos lotes."""
+        universo = ["DISC_1", "DISC_2", "DISC_3", "DISC_4"]
+
+        # Sem itens enfileirados e sem requisição em voo: em_execucao é False
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 0)
+        self.assertFalse(em_exec)
+
+        # Enfileira as 4 disciplinas
+        for c in universo:
+            self.gerenciador.adicionar(c, prioridade=1)
+
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 0)
+        self.assertTrue(em_exec)
+
+        # Despacha lote 1 (3 itens: DISC_1, DISC_2, DISC_3)
+        lote1 = self.gerenciador.proximo_lote()
+        self.assertEqual(len(lote1), 3)
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 0)  # Ainda não concluídos
+        self.assertTrue(em_exec)
+
+        # Conclui lote 1 (3 de 4 carregados = 75%)
+        self.gerenciador.concluir_lote({c: {"ok": True} for c in lote1})
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 75)
+        self.assertTrue(em_exec)  # Ainda resta DISC_4 na fila
+
+        # Despacha lote 2 (1 item: DISC_4)
+        lote2 = self.gerenciador.proximo_lote()
+        self.assertEqual(lote2, ["DISC_4"])
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 75)
+        self.assertTrue(em_exec)
+
+        # Conclui lote 2 (4 de 4 = 100%)
+        self.gerenciador.concluir_lote({"DISC_4": {"ok": True}})
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 100)
+        self.assertFalse(em_exec)
+
+    def test_progresso_com_cache_preexistente(self):
+        """Valida que cache preexistente inicia a porcentagem de forma proporcional."""
+        universo = ["DISC_A", "DISC_B", "DISC_C", "DISC_D"]
+        # Pré-popula 2 de 4 disciplinas
+        self.gerenciador.cache["DISC_A"] = {"ok": True}
+        self.gerenciador.cache["DISC_B"] = {"ok": True}
+
+        # Enfileira apenas as pendentes
+        self.gerenciador.adicionar("DISC_C", prioridade=1)
+        self.gerenciador.adicionar("DISC_D", prioridade=1)
+
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 50)
+        self.assertTrue(em_exec)
+
+    def test_progresso_nunca_exibe_100_com_pendencia(self):
+        """Garante que com itens pendentes o percentual não arredonda prematuramente para 100%."""
+        universo = [f"D_{i:03d}" for i in range(100)]
+        for i in range(99):
+            self.gerenciador.cache[f"D_{i:03d}"] = {"ok": True}
+        self.gerenciador.adicionar("D_099", prioridade=1)
+
+        pct, em_exec = self.gerenciador.calcular_progresso(universo)
+        self.assertEqual(pct, 99)
+        self.assertTrue(em_exec)
 
 
 class TestQueueFuzzing(unittest.TestCase):
