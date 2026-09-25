@@ -162,14 +162,14 @@
             🎯 Apenas colunas com resultado
           </button>
           <div id="txt-contador-resultados" class="txt-contador-resultados">Carregando salas e horários...</div>
+        </div>
+        <div class="acoes-direita">
           <div id="status-carregamento-dinamico" class="status-carregamento-dinamico" style="display: none;">
             <span class="status-carregamento-texto"><i>Carregando dados do Jupiterweb/Janus</i></span>
             <div class="progresso-dinamico-trilho">
               <div id="barra-progresso-dinamico-fill" class="progresso-dinamico-barra" style="width: 0%;"></div>
             </div>
           </div>
-        </div>
-        <div class="acoes-direita">
           <button type="button" class="btn-reset" onclick="resetarTodosFiltros()">
             🧹 Limpar Filtros
           </button>
@@ -309,8 +309,11 @@
         <a id="modal-btn-link-jupiter" href="#" target="_blank" rel="noopener noreferrer" class="btn-link-externo-jupiter">
           Abrir no Jupiterweb ↗
         </a>
+        <button type="button" id="modal-btn-trocar-sala" class="btn-trocar-sala" onclick="executarPesquisaTrocaDeSala()" title="Procurar salas livres para este horário e demanda">
+          Trocar de Sala ⇄
+        </button>
         <button type="button" id="modal-btn-filtrar-disciplina" class="btn-filtrar-disciplina" onclick="filtrarGradePorEstaDisciplina()">
-          Filtrar grade por disciplina
+          Filtrar disciplina
         </button>
         <button type="button" class="btn-fechar-modal" onclick="fecharCardDisciplina()">Fechar</button>
       </footer>

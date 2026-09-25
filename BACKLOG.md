@@ -69,6 +69,16 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.7.0:** Pesquisa Inteligente de Troca de Sala (Modo Salas Livres Automatizado) & Refinamentos de Layout:
+  - **Ação Rápida no Card Modal:** Adicionado o botão `Trocar de Sala ⇄` (`U+21C4`) posicionado em segundo lugar no rodapé do modal (logo após o link do Júpiter/Janus), em conformidade visual com o Design System (`docs/padroes-interface-botoes.md`);
+  - **Otimização de Espaço Horizontal:** Encurtamento do botão de filtro de disciplina para `Filtrar <DISCIPLINA>` (ex: *Filtrar SMA0356*), economizando mais de 60px horizontais e acomodando todos os 4 botões na mesma linha no desktop;
+  - **Realocação do Indicador de Carregamento:** Deslocamento da mensagem *"Carregando dados do Jupiterweb/Janus"* e barra de progresso para a direita do espaço livre na barra de ações, alinhada diretamente ao lado do botão `🧹 Limpar Filtros`;
+  - **Resolução Hierárquica de Horários & Múltiplas Aulas Semanais:** Preservação estrita do slot exato da célula clicada na grade para turmas com múltiplos dias semanais, com cálculo real de células mescladas de longa duração (`colspan`) sobre a matriz canônica da planilha e adaptação fluida para o primeiro horário oficial em caso de troca de aba;
+  - **Extração Resiliente de Demanda:** Captura automática de `matriculados` (Graduação) e `vagas` (Pós-Graduação) com proteção ao valor `0` e fallback amigável caso os dados ainda estejam em carregamento no Skeleton;
+  - **Limpeza Silenciosa e Filtragem Atômica:** Implementação de `limparBuscaSilenciosa()` para evitar re-renderizações intermediárias e roubo de foco do teclado, resetando blocos e salas para `'todos'` e aplicando dia, horário, capacidade mínima e modo de salas livres em um único ciclo de renderização;
+  - **Navegação e Acessibilidade:** Scroll suave para a grade, desassociação de elemento focado órfão e Toast confirmatório contextualizado citando a sala de origem e parâmetros aplicados;
+  - **Qualidade & Testes:** Criação da suíte `tests/test_troca_sala_logic.py` totalizando 107 testes automatizados (100% de sucesso);
+  - **Governança:** Registrado no ADR 0021.
 - [x] **v1.6.1:** Refinamento Visual do Card Modal (Largura Total do Campo de Alunos / Vagas):
   - Expansão da largura do container `.modal-alunos-dado` para 100% da largura útil do card (`display: flex; width: 100%;`), eliminando o aspecto de bloco reduzido (`fit-content`) e estabelecendo perfeita simetria visual com os demais blocos do modal (docentes responsáveis, horários oficiais e observações).
 - [x] **v1.6.0:** Exibição de Alunos Matriculados (Graduação/Jupiterweb) e Vagas Oferecidas (Pós-Graduação/Janus) no Card Modal da Grade:

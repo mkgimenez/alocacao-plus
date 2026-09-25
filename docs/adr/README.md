@@ -28,6 +28,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0018](0018-chips-busca-exclusivos-grade-e-resiliencia-estado-vazio.md) | Chips da Busca Baseados Exclusivamente na Grade Atual e Resiliência do Estado Vazio | **Aceito** | 2026-09-25 |
 | [0019](0019-otimizacao-espaco-vertical-e-camadas-sticky.md) | Otimização de Espaço Vertical, Camadas Sticky da Grade e Refinamento do Cabeçalho | **Aceito** | 2026-09-25 |
 | [0020](0020-exibicao-alunos-matriculados-e-vagas-card-modal.md) | Exibição de Alunos Matriculados (Jupiterweb) e Vagas Oferecidas (Janus) no Card Modal da Grade | **Aceito** | 2026-09-25 |
+| [0021](0021-pesquisa-troca-de-sala-inteligente.md) | Pesquisa Inteligente de Troca de Sala (Modo Salas Livres Automatizado) | **Aceito** | 2026-09-25 |
 
 ---
 

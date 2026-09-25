@@ -3264,6 +3264,10 @@
   let celulaAtivaInfo = null;
   let timerDestaqueCelulaModal = null;
   let codigoAtivoModal = null;
+  let dadosAtivosModal = null;
+  let turmaAtivaModalNum = null;
+  let turmaAtivaModalObj = null;
+  let celulaDisparadoraModal = null;
 
   /**
    * Abre o Card Modal Elegante para exibição de detalhes completos da disciplina.
@@ -3272,6 +3276,10 @@
     if (!codigo) return;
     const cod = String(codigo).trim().toUpperCase();
     codigoAtivoModal = cod;
+    dadosAtivosModal = null;
+    turmaAtivaModalNum = null;
+    turmaAtivaModalObj = null;
+    celulaDisparadoraModal = null;
 
     ultimoElementoFocado = elementoDisparador || document.activeElement;
 
@@ -3298,13 +3306,41 @@
         td.classList.add('celula-ativa-modal');
         celulaAtivaModal = td;
         const tr = td.closest('tr');
-        const rIdx = tr ? tr.getAttribute('data-idx') : null;
-        const cIdx = td.getAttribute('data-cidx');
+        const rIdx = tr ? parseInt(tr.getAttribute('data-idx'), 10) : null;
+        const cIdxAttr = td.getAttribute('data-cidx');
+        const cIdx = (cIdxAttr !== null && cIdxAttr !== '') ? parseInt(cIdxAttr, 10) : null;
         celulaAtivaInfo = {
           rIdx: rIdx,
           cIdx: cIdx,
           expireAt: 0 // 0 indica que o modal está aberto
         };
+
+        // Extrai metadados completos da célula disparadora para a pesquisa de troca de sala
+        if (estadoApp.dadosBrutos && rIdx !== null && !isNaN(rIdx) && cIdx !== null && !isNaN(cIdx)) {
+          const dadosB = estadoApp.dadosBrutos;
+          const slots = dadosB.slots || [];
+          const salas = dadosB.salas || [];
+          const grade = dadosB.grade || [];
+          const linha = grade[rIdx] || [];
+          const celEfetiva = (linha[cIdx] && linha[cIdx].t) ? linha[cIdx] : obterCelulaEfetiva(linha, cIdx);
+          const csReal = (celEfetiva && celEfetiva.cs) ? celEfetiva.cs : 1;
+          const slotIni = slots[cIdx];
+          const endIdx = Math.min(cIdx + csReal - 1, slots.length - 1);
+          const slotFim = slots[endIdx];
+          const salaObj = salas[rIdx];
+
+          celulaDisparadoraModal = {
+            rIdx: rIdx,
+            cIdx: cIdx,
+            cs: csReal,
+            dia: slotIni ? slotIni.dia : null,
+            horaInicioMin: slotIni ? slotIni.horaInicioMin : null,
+            horaFimMin: slotFim ? slotFim.horaFimMin : null,
+            textoInicio: slotIni ? (slotIni.textoInicio || slotIni.label) : '',
+            textoFim: slotFim ? (slotFim.textoFim || slotFim.label) : '',
+            nomeSala: salaObj ? salaObj.nome : ''
+          };
+        }
       }
     }
 
@@ -3345,7 +3381,7 @@
 
     const btnFiltrar = document.getElementById('modal-btn-filtrar-disciplina');
     if (btnFiltrar) {
-      btnFiltrar.textContent = 'Filtrar grade por ' + cod;
+      btnFiltrar.textContent = 'Filtrar ' + cod;
     }
 
     const dados = obterCacheJupiter(cod);
@@ -3397,6 +3433,7 @@
    * Preenche a interface do modal com os dados estruturados recebidos.
    */
   function exibirDadosModal(codigo, dados, turmasSolicitadas) {
+    dadosAtivosModal = dados;
     const elSkeleton = document.getElementById('modal-card-skeleton');
     if (elSkeleton) elSkeleton.style.display = 'none';
 
@@ -3494,6 +3531,9 @@
     const turmasObj = dados.turmas || {};
     const turmaObj = turmasObj[turmaEscolhida];
     if (!turmaObj) return;
+
+    turmaAtivaModalNum = turmaEscolhida;
+    turmaAtivaModalObj = turmaObj;
 
     // Atualiza classes ativas das pills
     const pills = document.querySelectorAll('#modal-seletor-turmas .btn-pill-turma');
@@ -3660,6 +3700,274 @@
       }, 50);
     }
     aoBuscarSala(cod);
+  }
+
+  /**
+   * Limpa a busca textual de forma silenciosa, sem disparar renderização prematura
+   * e sem roubar o foco do teclado do usuário.
+   */
+  function limparBuscaSilenciosa() {
+    estadoApp.buscaSala = '';
+    const inpBusca = document.getElementById('input-busca-sala');
+    if (inpBusca) {
+      inpBusca.value = '';
+    }
+    const btnLimpar = document.getElementById('btn-limpar-busca');
+    if (btnLimpar) {
+      btnLimpar.style.display = 'none';
+    }
+    const btnColunas = document.getElementById('btn-toggle-colunas-match');
+    if (btnColunas) {
+      btnColunas.style.display = 'none';
+    }
+    if (typeof fecharSugestoesBusca === 'function') {
+      fecharSugestoesBusca();
+    }
+    atualizarEstadoBotaoLivres();
+  }
+
+  /**
+   * Converte string de hora 'HH:MM' para minutos desde 00:00 (ex: '08:00' -> 480).
+   */
+  function horaTextoParaMinutos(str) {
+    if (!str) return null;
+    const m = String(str).trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  /**
+   * Normaliza formatos diversos de dia da semana para chave canônica ('seg', 'ter', 'qua', 'qui', 'sex', 'sab').
+   */
+  function normalizarDiaSemanaJS(diaStr) {
+    if (!diaStr) return null;
+    const s = normalizarTexto(diaStr);
+    if (/\b(seg|segunda|2a|2ª)\b/.test(s)) return 'seg';
+    if (/\b(ter|terca|3a|3ª)\b/.test(s)) return 'ter';
+    if (/\b(qua|quarta|4a|4ª)\b/.test(s)) return 'qua';
+    if (/\b(qui|quinta|5a|5ª)\b/.test(s)) return 'qui';
+    if (/\b(sex|sexta|6a|6ª)\b/.test(s)) return 'sex';
+    if (/\b(sab|sabado)\b/.test(s)) return 'sab';
+    return null;
+  }
+
+  /**
+   * Executa a pesquisa inteligente de troca de sala a partir do card modal.
+   * Fecha o modal, extrai a demanda e horário da aula, aplica os filtros de salas livres
+   * e rola a tela até a grade com feedback informativo.
+   */
+  function executarPesquisaTrocaDeSala() {
+    const dados = dadosAtivosModal;
+    const turmaObj = turmaAtivaModalObj;
+    const celulaInfo = celulaDisparadoraModal;
+    const cod = codigoAtivoModal || (dados ? dados.codigo : '');
+
+    const ehPos = (dados && dados.sistema === 'janus') || /^[A-Za-z]{3}[1-9]\d{3}$/.test(cod || '');
+
+    // 1. Extração de Demanda (Matriculados ou Vagas)
+    let demanda = 0;
+    let demandaInformada = false;
+
+    if (turmaObj) {
+      if (ehPos) {
+        if (turmaObj.vagas !== undefined && turmaObj.vagas !== null) {
+          const v = parseInt(turmaObj.vagas, 10);
+          if (!isNaN(v) && v >= 0) {
+            demanda = v;
+            demandaInformada = true;
+          }
+        }
+      } else {
+        if (turmaObj.matriculados !== undefined && turmaObj.matriculados !== null) {
+          const m = parseInt(turmaObj.matriculados, 10);
+          if (!isNaN(m) && m >= 0) {
+            demanda = m;
+            demandaInformada = true;
+          }
+        }
+      }
+    }
+
+    // 2. Resolução de Dia e Intervalo de Horário (minutos)
+    let diaAlvo = null;
+    let horaInicioMin = null;
+    let horaFimMin = null;
+    let textoHorario = '';
+    let nomeSalaOrigem = celulaInfo ? (celulaInfo.nomeSala || '') : '';
+
+    const horariosTurma = (turmaObj && turmaObj.horarios) ? turmaObj.horarios : [];
+
+    if (celulaInfo && celulaInfo.dia && celulaInfo.horaInicioMin !== null && celulaInfo.horaFimMin !== null) {
+      // Prioridade 1: Verifica se a turma ativa possui horários cadastrados
+      if (horariosTurma.length > 0) {
+        // Procura se a turma ativa tem aula no MESMO dia da célula clicada
+        const horarioMesmoDia = horariosTurma.find(h => normalizarDiaSemanaJS(h.dia) === celulaInfo.dia);
+        if (horarioMesmoDia) {
+          diaAlvo = celulaInfo.dia;
+          horaInicioMin = celulaInfo.horaInicioMin;
+          horaFimMin = celulaInfo.horaFimMin;
+          textoHorario = (celulaInfo.textoInicio && celulaInfo.textoFim)
+            ? `${celulaInfo.textoInicio} às ${celulaInfo.textoFim}`
+            : `${minParaTexto(horaInicioMin)} às ${minParaTexto(horaFimMin)}`;
+        } else {
+          // Turma ativa sem aula no dia da célula original (usuário alternou de aba para turma diferente)
+          const primeiro = horariosTurma[0];
+          diaAlvo = normalizarDiaSemanaJS(primeiro.dia);
+          const hIni = horaTextoParaMinutos(primeiro.inicio);
+          const hFim = horaTextoParaMinutos(primeiro.fim);
+          if (diaAlvo && hIni !== null && hFim !== null) {
+            horaInicioMin = hIni;
+            horaFimMin = hFim;
+            textoHorario = `${primeiro.inicio} às ${primeiro.fim}`;
+          }
+        }
+      } else {
+        // Turma sem horários oficiais estruturados (ou dados ainda em carregamento): usa dados da célula da grade
+        diaAlvo = celulaInfo.dia;
+        horaInicioMin = celulaInfo.horaInicioMin;
+        horaFimMin = celulaInfo.horaFimMin;
+        textoHorario = (celulaInfo.textoInicio && celulaInfo.textoFim)
+          ? `${celulaInfo.textoInicio} às ${celulaInfo.textoFim}`
+          : `${minParaTexto(horaInicioMin)} às ${minParaTexto(horaFimMin)}`;
+      }
+    } else if (horariosTurma.length > 0) {
+      // Modal aberto sem contexto de célula
+      const primeiro = horariosTurma[0];
+      diaAlvo = normalizarDiaSemanaJS(primeiro.dia);
+      const hIni = horaTextoParaMinutos(primeiro.inicio);
+      const hFim = horaTextoParaMinutos(primeiro.fim);
+      if (diaAlvo && hIni !== null && hFim !== null) {
+        horaInicioMin = hIni;
+        horaFimMin = hFim;
+        textoHorario = `${primeiro.inicio} às ${primeiro.fim}`;
+      }
+    }
+
+    // Se nenhum dia ou horário pôde ser determinado
+    if (!diaAlvo || horaInicioMin === null || horaFimMin === null) {
+      exibirToast(
+        'Troca de Sala Indisponível',
+        'Não foi possível identificar o dia e horário desta disciplina para busca de salas livres.',
+        'info'
+      );
+      fecharCardDisciplina();
+      return;
+    }
+
+    // 3. Fecha o modal de forma limpa (desassocia ultimoElementoFocado para evitar foco em célula removida)
+    ultimoElementoFocado = null;
+    fecharCardDisciplina();
+
+    // 4. Limpeza silenciosa de busca textual (sem re-renderização prematura e sem roubo de foco)
+    limparBuscaSilenciosa();
+
+    // 5. Configuração atômica do estadoApp
+    estadoApp.blocosSelecionados.clear();
+    estadoApp.blocosSelecionados.add('todos');
+
+    estadoApp.salasSelecionadas.clear();
+    estadoApp.salasSelecionadas.add('todas');
+
+    estadoApp.diasSelecionados.clear();
+    estadoApp.diasSelecionados.add(diaAlvo);
+
+    estadoApp.horaInicioMin = horaInicioMin;
+    estadoApp.horaFimMin = horaFimMin;
+    estadoApp.capacidadeMin = demanda;
+    estadoApp.apenasLivres = true;
+
+    // 6. Sincronização rigorosa dos Controles Visuais
+    // Chips de Dias
+    document.querySelectorAll('#container-dias .chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.dia === diaAlvo);
+    });
+
+    // Chips de Blocos
+    document.querySelectorAll('#container-blocos .chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.bloco === 'todos');
+    });
+    const badgeBlocos = document.getElementById('badge-blocos-resumo');
+    if (badgeBlocos) badgeBlocos.textContent = 'Todos';
+
+    // Chips de Salas
+    document.querySelectorAll('#container-salas .chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.sala === 'todas');
+    });
+    const badgeSalas = document.getElementById('badge-salas-resumo');
+    if (badgeSalas) badgeSalas.textContent = 'Todas';
+
+    // Dropdowns de Horário
+    const selIni = document.getElementById('sel-hora-inicio');
+    const selFim = document.getElementById('sel-hora-fim');
+    if (selIni && estadoApp.horariosInicioDisponiveis && estadoApp.horariosInicioDisponiveis.length > 0) {
+      const iniProx = encontrarMinutoMaisProximo(estadoApp.horariosInicioDisponiveis, horaInicioMin);
+      if (iniProx !== null) {
+        selIni.value = iniProx;
+        estadoApp.horaInicioMin = iniProx;
+      }
+    }
+    if (selFim && estadoApp.horariosFimDisponiveis && estadoApp.horariosFimDisponiveis.length > 0) {
+      const optsValidasFim = (estadoApp.horaInicioMin !== null)
+        ? estadoApp.horariosFimDisponiveis.filter(o => o.min > estadoApp.horaInicioMin)
+        : estadoApp.horariosFimDisponiveis;
+      const fimProx = encontrarMinutoMaisProximo(optsValidasFim, horaFimMin);
+      if (fimProx !== null) {
+        selFim.value = fimProx;
+        estadoApp.horaFimMin = fimProx;
+      }
+    }
+    atualizarOpcoesDropdownsHorarios('ambos');
+    atualizarEstiloValidacaoHorarios();
+
+    // Input de Capacidade e Badge
+    const inpCap = document.getElementById('input-capacidade-min');
+    if (inpCap) inpCap.value = demanda > 0 ? demanda : '';
+    document.querySelectorAll('.chips-atalhos-cap .chip-sm').forEach(btn => {
+      btn.classList.toggle('active', btn.id === `chip-cap-${demanda}`);
+    });
+    const badgeCap = document.getElementById('badge-capacidade-resumo');
+    if (badgeCap) {
+      badgeCap.textContent = demanda > 0 ? (demanda === 1 ? '1 lugar' : `${demanda}+ lugares`) : 'Todas';
+    }
+
+    // Botão Modo Livres
+    const btnLivres = document.getElementById('btn-modo-livres');
+    if (btnLivres) {
+      btnLivres.classList.add('ativo');
+      btnLivres.disabled = false;
+      btnLivres.title = '';
+    }
+
+    // 7. Disparo da filtragem unificada (renderização única)
+    aplicarFiltrosEAtualizarVisualizacao();
+
+    // 8. Scroll Suave e Acessibilidade
+    const secaoGrade = document.querySelector('.grade-section') || document.getElementById('grade-tabela-container');
+    if (secaoGrade) {
+      secaoGrade.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 9. Feedback Toast Contextualizado
+    const mapaNomesDias = {
+      seg: 'Segunda-feira',
+      ter: 'Terça-feira',
+      qua: 'Quarta-feira',
+      qui: 'Quinta-feira',
+      sex: 'Sexta-feira',
+      sab: 'Sábado'
+    };
+    const nomeDiaExtenso = mapaNomesDias[diaAlvo] || diaAlvo;
+    const rotuloCap = demanda > 0
+      ? (ehPos ? `vagas ≥ ${demanda}` : `alunos ≥ ${demanda}`)
+      : 'todas capacidades';
+
+    const infoOrigem = nomeSalaOrigem ? ` para substituir ${nomeSalaOrigem}` : '';
+    let msgToast = `Exibindo salas livres${infoOrigem} (${rotuloCap}) em ${nomeDiaExtenso} (${textoHorario}).`;
+    if (!demandaInformada) {
+      msgToast = `Demanda não informada. Exibindo todas as salas livres${infoOrigem} em ${nomeDiaExtenso} (${textoHorario}).`;
+    }
+
+    exibirToast('Pesquisa de Troca de Sala ⇄', msgToast, 'sucesso', 5000);
   }
 
   /**
