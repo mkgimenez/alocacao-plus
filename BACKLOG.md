@@ -69,6 +69,8 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.6.1:** Refinamento Visual do Card Modal (Largura Total do Campo de Alunos / Vagas):
+  - Expansão da largura do container `.modal-alunos-dado` para 100% da largura útil do card (`display: flex; width: 100%;`), eliminando o aspecto de bloco reduzido (`fit-content`) e estabelecendo perfeita simetria visual com os demais blocos do modal (docentes responsáveis, horários oficiais e observações).
 - [x] **v1.6.0:** Exibição de Alunos Matriculados (Graduação/Jupiterweb) e Vagas Oferecidas (Pós-Graduação/Janus) no Card Modal da Grade:
   - **Graduação (Jupiterweb):** Extração robusta no backend de contagem de alunos matriculados (`matriculados`) somando as categorias da tabela de distribuição de vagas (`colspan=2`, 5 células) e ignorando linhas subordinadas de cursos (6 células), com delimitação estrita entre `Matriculado` e `</table>`;
   - **Pós-Graduação (Janus):** Extração resiliente de vagas oferecidas (`vagas`) a partir da tabela de vagas (`intl_numeroVagas` / `Número de vagas`) no endpoint `TurmaDet`, mapeando dinamicamente o índice da coluna `Total`;

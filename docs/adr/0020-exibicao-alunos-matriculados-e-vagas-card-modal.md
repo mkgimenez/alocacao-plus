@@ -40,7 +40,7 @@ Adicionalmente, havia o risco de regressão por dados em cache pré-existentes n
    - Para Graduação: Exibe `👥 Alunos Matriculados: [N]`.
    - Para Pós-Graduação: Exibe `👥 Número de Vagas: [N]`.
    - Verificação estrita de presença (`turmaObj.matriculados !== undefined && turmaObj.matriculados !== null`), assegurando que `0` seja renderizado como `"0"` e não como `"Não informado"`.
-   - Estilização com tipografia tabular (`font-variant-numeric: tabular-nums`).
+   - Estilização com largura total (`display: flex; width: 100%;`) e tipografia tabular (`font-variant-numeric: tabular-nums`), mantendo simetria geométrica com as demais seções do modal.
 
 4. **Invalidação e Versionamento de Cache:**
    - Atualizados os prefixos do `CacheService` no servidor para `JUP_V19_` e `JAN_V3_`.
