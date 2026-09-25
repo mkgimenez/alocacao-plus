@@ -1,6 +1,5 @@
 ## 📥 Inbox (Captura Rápida)
 
-- [ ] Mudar cor das células até que o carregamento esteja completo
 ---
 
 
@@ -70,6 +69,20 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.5.0:** Coloração Progressiva da Grade, Priorização Geométrica no Viewport 2D & Consolidação do Card Modal:
+  - Células da grade iniciam com cores neutras (`.celula-aula-pendente`), transitando suavemente (`transition: 0.4s`) para as tonalidades oficiais (azul céu para graduação e azul cobalto para pós) conforme cada lote é concluído pelo worker em segundo plano;
+  - Micro-animação tátil (`celula-recem-carregada`) que sinaliza discretamente a prontidão do card modal;
+  - Reestruturação completa do agendador com detecção geométrica do Viewport 2D (interseção das salas visíveis e colunas de horários visíveis no container da tabela);
+  - Prioridade 1 estrita para as células atualmente na tela, consumidas na ordem natural de leitura (de cima para baixo, da esquerda para a direita);
+  - Prioridade 2 para extensões horizontais, salas abaixo da rolagem e salas filtradas;
+  - Reordenação dinâmica real da fila ao rolar a grade (scroll vertical ou horizontal com debounce reduzido para 150ms);
+  - Promoção instantânea para Prioridade 0 (urgência máxima) com abertura do card modal em esqueleto animado (*skeleton shimmer*) ao clicar em qualquer disciplina pendente;
+  - Remoção da setinha indicadora de link externo (`↗`) nas células da grade (`.celula-aula a`, `.celula-pos a`, `.link-disc`), alinhando o feedback visual com a abertura do Card Modal interno;
+  - Preservação das setas `↗` estritamente nos botões de abertura externa no rodapé do Card Modal;
+  - Remoção da linha de consultas diretas externas do rodapé da aplicação, mantendo o rodapé limpo e centralizado;
+  - Atualização do `title` padrão dos links na geração HTML no backend (`alocacao-plus.gs`);
+  - Formalização arquitetural no ADR 0017;
+  - Criação da suíte `tests/test_cell_coloring_logic.py` e expansão de `tests/test_queue_logic.py`, totalizando 72 testes automatizados (100% de sucesso).
 - [x] **v1.4.0:** Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes):
   - Popover customizado com chips rápidos acessíveis via teclado (`↑`, `↓`, `Enter`, `Esc`) e clique com prevenção de perda de foco;
   - Catálogo abrangente de departamentos da EESC (`SEM`, `SEL`, `SET`, `SEP`, `SMM`, `SHS`, `SGS`, `SAA`, `STT`, `SRB`) e unidades do campus São Carlos (`SMA`, `SME`, `SSC`, `SCC`, `760`, `SLC`, `FMT`, `FFI`, `SQM`, `QFL`, `QIQ`, `QOQ`, `IAU`);

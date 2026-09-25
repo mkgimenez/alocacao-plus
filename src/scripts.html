@@ -2160,7 +2160,21 @@
 
         const csAttr = (colspanVisivel > 1) ? ` colspan="${colspanVisivel}"` : '';
         const bgStyle = (celEfetiva && celEfetiva.bg) ? ` style="background-color: ${celEfetiva.bg};"` : '';
-        const aulaClass = temAula ? (celEfetiva.pos ? ' celula-aula celula-pos' : ' celula-aula') : ' celula-livre';
+
+        const temDisciplinas = Boolean(celEfetiva && celEfetiva.d && Array.isArray(celEfetiva.d) && celEfetiva.d.length > 0);
+        let todasCarregadas = false;
+        if (temDisciplinas) {
+          todasCarregadas = celEfetiva.d.every(c => Boolean(obterCacheJupiter(c)));
+        }
+
+        let pendenteClass = '';
+        if (temDisciplinas) {
+          pendenteClass = todasCarregadas ? ' celula-carregada' : ' celula-aula-pendente';
+        }
+
+        const aulaClass = temAula
+          ? (celEfetiva.pos ? ' celula-aula celula-pos' : ' celula-aula') + pendenteClass
+          : ' celula-livre';
 
         let destaqueClass = '';
         if (temBusca && temAula && celulaCorrespondeABusca(celEfetiva, tokensBusca)) {
@@ -2185,7 +2199,9 @@
         const ehFimDoDia = (slotFimCelula === ultimoSlotDoDia) && (dIdx < diasChaves.length - 1);
         const bordaFim = ehFimDoDia ? ' col-dia-fim' : '';
 
-        tbodyHtml += `<td class="celula-grade ${diaClass}${bordaFim}${aulaClass}${destaqueClass}${ativaModalClass}" data-cidx="${itemSlot.cIdx}"${csAttr}${bgStyle}>${conteudo}</td>`;
+        const codigosAttr = temDisciplinas ? ` data-codigos="${escapeHtml(celEfetiva.d.map(c => String(c).trim().toUpperCase()).join(','))}"` : '';
+
+        tbodyHtml += `<td class="celula-grade ${diaClass}${bordaFim}${aulaClass}${destaqueClass}${ativaModalClass}" data-cidx="${itemSlot.cIdx}"${codigosAttr}${csAttr}${bgStyle}>${conteudo}</td>`;
 
         colIdxRelativo += colspanVisivel;
       }
@@ -2461,6 +2477,7 @@
     if (itemExistente) {
       if (prioridade < itemExistente.prioridade) {
         itemExistente.prioridade = prioridade;
+        if (prioridade === 0) itemExistente.ordem = --estadoApp.jupiterContadorOrdem;
         reordenarFilaJupiter();
       }
       return true;
@@ -2470,7 +2487,7 @@
     estadoApp.filaJupiter.push({
       codigo: cod,
       prioridade: prioridade,
-      ordem: ++estadoApp.jupiterContadorOrdem
+      ordem: (prioridade === 0) ? --estadoApp.jupiterContadorOrdem : ++estadoApp.jupiterContadorOrdem
     });
     reordenarFilaJupiter();
     return true;
@@ -2508,84 +2525,103 @@
   }
 
   /**
-   * Reordena a fila: prioridade 0 (urgente) primeiro, depois 1 (visível), depois 2 (oculto).
-   * Para mesma prioridade, mantém ordem FIFO de chegada.
+   * Reordena a fila: prioridade 0 (urgente) primeiro, depois 1 (visível na tela), depois 2 (oculto).
+   * Para Prioridade 1: respeita rigorosamente a ordem visual no viewport (leitura natural).
+   * Para Prioridade 2: respeita a ordem relativa de proximidade/extensão.
+   * Para Prioridade 0 ou desempate geral: mantém FIFO.
    */
   function reordenarFilaJupiter() {
     estadoApp.filaJupiter.sort((a, b) => {
       if (a.prioridade !== b.prioridade) {
         return a.prioridade - b.prioridade;
       }
+      if (a.prioridade === 1) {
+        const posA = (a.posicaoVisual !== undefined) ? a.posicaoVisual : 99999;
+        const posB = (b.posicaoVisual !== undefined) ? b.posicaoVisual : 99999;
+        if (posA !== posB) return posA - posB;
+      } else if (a.prioridade === 2) {
+        const posA = (a.posicaoOculta !== undefined) ? a.posicaoOculta : 99999;
+        const posB = (b.posicaoOculta !== undefined) ? b.posicaoOculta : 99999;
+        if (posA !== posB) return posA - posB;
+      }
       return a.ordem - b.ordem;
     });
   }
 
   /**
-   * Reavalia prioridades da fila com base nos elementos visíveis na grade.
+   * Reavalia prioridades da fila com base nos elementos estritamente visíveis no viewport 2D.
+   * Prioridade 0 (urgente) é sempre preservada intacta.
    */
   function atualizarVisibilidadeFilaJupiter(codigosVisiveis, todosCodigos) {
-    const listaVisiveis = [];
-    const setVisiveis = new Set();
-
+    const mapaPosVisual = new Map();
     (codigosVisiveis || []).forEach(c => {
       if (c) {
         const cn = String(c).trim().toUpperCase();
-        if (cn && !setVisiveis.has(cn)) {
-          setVisiveis.add(cn);
-          listaVisiveis.push(cn);
+        if (!mapaPosVisual.has(cn)) {
+          mapaPosVisual.set(cn, mapaPosVisual.size);
         }
       }
     });
 
-    // 1. Atualiza prioridade dos itens já na fila (preserva Prioridade 0 urgente)
-    estadoApp.filaJupiter.forEach(item => {
-      if (item.prioridade === 0) return;
-      if (setVisiveis.has(item.codigo)) {
-        item.prioridade = 1;
-      } else {
-        item.prioridade = 2;
+    const mapaPosOculta = new Map();
+    const listaOcultos = [];
+    (todosCodigos || []).forEach(c => {
+      if (c) {
+        const cn = String(c).trim().toUpperCase();
+        if (!mapaPosVisual.has(cn) && !mapaPosOculta.has(cn)) {
+          mapaPosOculta.set(cn, mapaPosOculta.size);
+          listaOcultos.push(cn);
+        }
       }
     });
 
-    // 2. Adiciona novos códigos visíveis ainda não presentes (com Prioridade 1)
-    listaVisiveis.forEach(cod => {
+    // 1. Atualiza prioridade e posições relativas dos itens já existentes na fila
+    estadoApp.filaJupiter.forEach(item => {
+      if (item.prioridade === 0) return; // Preserva urgente
+      if (mapaPosVisual.has(item.codigo)) {
+        item.prioridade = 1;
+        item.posicaoVisual = mapaPosVisual.get(item.codigo);
+      } else {
+        item.prioridade = 2;
+        item.posicaoOculta = mapaPosOculta.has(item.codigo) ? mapaPosOculta.get(item.codigo) : 99999;
+      }
+    });
+
+    // 2. Adiciona novos códigos visíveis ainda não presentes (com Prioridade 1 e posição visual)
+    mapaPosVisual.forEach((posVisual, cod) => {
       if (!obterCacheJupiter(cod) && !(estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1)) {
         if (!estadoApp.filaJupiter.some(item => item.codigo === cod)) {
           estadoApp.filaJupiter.push({
             codigo: cod,
             prioridade: 1,
+            posicaoVisual: posVisual,
             ordem: ++estadoApp.jupiterContadorOrdem
           });
         }
       }
     });
 
-    // 3. Adiciona demais códigos com Prioridade 2 (ocultos) se informados
-    if (todosCodigos) {
-      const vistosTodos = new Set();
-      todosCodigos.forEach(codRaw => {
-        if (!codRaw) return;
-        const cod = String(codRaw).trim().toUpperCase();
-        if (cod && !setVisiveis.has(cod) && !vistosTodos.has(cod) && !obterCacheJupiter(cod)) {
-          vistosTodos.add(cod);
-          if (!(estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1)) {
-            if (!estadoApp.filaJupiter.some(item => item.codigo === cod)) {
-              estadoApp.filaJupiter.push({
-                codigo: cod,
-                prioridade: 2,
-                ordem: ++estadoApp.jupiterContadorOrdem
-              });
-            }
-          }
+    // 3. Adiciona demais códigos com Prioridade 2 (ocultos)
+    listaOcultos.forEach(cod => {
+      if (!obterCacheJupiter(cod) && !(estadoApp.jupiterRequisicaoEmVoo && estadoApp.jupiterLoteEmVoo.indexOf(cod) !== -1)) {
+        if (!estadoApp.filaJupiter.some(item => item.codigo === cod)) {
+          estadoApp.filaJupiter.push({
+            codigo: cod,
+            prioridade: 2,
+            posicaoOculta: mapaPosOculta.get(cod),
+            ordem: ++estadoApp.jupiterContadorOrdem
+          });
         }
-      });
-    }
+      }
+    });
 
     reordenarFilaJupiter();
   }
 
   /**
-   * Extrai os códigos das células visíveis (respeitando viewport) e de toda a grade, agendando na fila.
+   * Extrai códigos no Viewport 2D real (interseção das linhas e colunas visíveis na tela)
+   * e agenda o enriquecimento progressivo garantindo que o usuário veja as células
+   * à sua frente carregarem primeiro.
    */
   function extrairCodigosVisiveisEAgendar() {
     if (!estadoApp.dadosBrutos || !estadoApp.dadosBrutos.grade) return;
@@ -2595,47 +2631,88 @@
     const salasVisiveis = estadoApp._salasVisiveisAtuais || [];
     const slotsAtivos = estadoApp._slotsAtivosAtuais || [];
 
-    const codigosVisiveisSet = new Set();
-    const codigosVisiveis = [];
+    if (salasVisiveis.length === 0 || slotsAtivos.length === 0) return;
 
-    // Prioriza elementos no viewport se tabela estiver montada
     const containerGrade = document.getElementById('grade-tabela-container');
-    const containerRect = containerGrade ? containerGrade.getBoundingClientRect() : null;
+    const containerRect = (containerGrade && containerGrade.offsetWidth > 0 && containerGrade.offsetHeight > 0)
+      ? containerGrade.getBoundingClientRect()
+      : null;
 
-    let salasOrdenadas = salasVisiveis;
+    let salasNoViewport = [];
+    let salasForaViewport = [];
+    let slotsNoViewport = [];
+    let slotsForaViewport = [];
+
+    // 1. Identificação Vertical (Linhas/Salas no Viewport)
     if (containerGrade && containerRect) {
       const linhasTr = containerGrade.querySelectorAll('tr.linha-grade-sala');
-      const setIdxViewport = new Set();
+      const setIdxSalasViewport = new Set();
+      const margemY = 40;
 
       linhasTr.forEach(tr => {
         const rect = tr.getBoundingClientRect();
-        if (rect.bottom >= (containerRect.top - 80) && rect.top <= (containerRect.bottom + 80)) {
+        if (rect.bottom >= (containerRect.top - margemY) && rect.top <= (containerRect.bottom + margemY)) {
           const idx = parseInt(tr.getAttribute('data-idx'), 10);
-          if (!isNaN(idx)) setIdxViewport.add(idx);
+          if (!isNaN(idx)) setIdxSalasViewport.add(idx);
         }
       });
 
-      if (setIdxViewport.size > 0) {
-        const noViewport = [];
-        const foraViewport = [];
+      if (setIdxSalasViewport.size > 0) {
         salasVisiveis.forEach(item => {
-          if (setIdxViewport.has(item.rIdx)) {
-            noViewport.push(item);
+          if (setIdxSalasViewport.has(item.rIdx)) {
+            salasNoViewport.push(item);
           } else {
-            foraViewport.push(item);
+            salasForaViewport.push(item);
           }
         });
-        salasOrdenadas = noViewport.concat(foraViewport);
       }
     }
 
-    // 1. Extrai códigos das salas visíveis na ordem visual
-    salasOrdenadas.forEach(itemSala => {
-      const rIdx = itemSala.rIdx;
-      const linha = matrizGrade[rIdx] || [];
-      slotsAtivos.forEach(itemSlot => {
-        const cIdx = itemSlot.cIdx;
-        const cel = obterCelulaEfetiva(linha, cIdx);
+    // Fallback vertical se a tabela ainda estiver em fase de layout
+    if (salasNoViewport.length === 0) {
+      salasNoViewport = salasVisiveis.slice(0, 8);
+      salasForaViewport = salasVisiveis.slice(8);
+    }
+
+    // 2. Identificação Horizontal (Colunas/Slots no Viewport)
+    if (containerGrade && containerRect) {
+      const thSlots = containerGrade.querySelectorAll('thead th.th-slot-header');
+      const setIdxSlotsViewport = new Set();
+      const margemX = 40;
+
+      thSlots.forEach((th, sIdx) => {
+        const rect = th.getBoundingClientRect();
+        if (rect.right >= (containerRect.left - margemX) && rect.left <= (containerRect.right + margemX)) {
+          setIdxSlotsViewport.add(sIdx);
+        }
+      });
+
+      if (setIdxSlotsViewport.size > 0) {
+        slotsAtivos.forEach((item, sIdx) => {
+          if (setIdxSlotsViewport.has(sIdx)) {
+            slotsNoViewport.push(item);
+          } else {
+            slotsForaViewport.push(item);
+          }
+        });
+      }
+    }
+
+    // Fallback horizontal se colunas ainda não foram pintadas
+    if (slotsNoViewport.length === 0) {
+      slotsNoViewport = slotsAtivos.slice(0, 8);
+      slotsForaViewport = slotsAtivos.slice(8);
+    }
+
+    // 3. Montagem dos Códigos Prioridade 1 (Viewport 2D: Salas visíveis x Slots visíveis)
+    // Varredura na ordem natural de leitura: linha a linha (topo para base), coluna a coluna (esq para dir)
+    const codigosVisiveisSet = new Set();
+    const codigosVisiveis = [];
+
+    salasNoViewport.forEach(itemSala => {
+      const linha = matrizGrade[itemSala.rIdx] || [];
+      slotsNoViewport.forEach(itemSlot => {
+        const cel = obterCelulaEfetiva(linha, itemSlot.cIdx);
         if (cel && cel.d && Array.isArray(cel.d)) {
           cel.d.forEach(cod => {
             const codNorm = String(cod).trim().toUpperCase();
@@ -2648,10 +2725,45 @@
       });
     });
 
-    // 2. Extrai demais códigos da grade completa
+    // 4. Montagem dos Demais Códigos (Prioridade 2):
+    // 4a. Slots horizontais fora do viewport para as salas que estão na tela
     const todosCodigosSet = new Set(codigosVisiveisSet);
     const todosCodigos = [...codigosVisiveis];
 
+    salasNoViewport.forEach(itemSala => {
+      const linha = matrizGrade[itemSala.rIdx] || [];
+      slotsForaViewport.forEach(itemSlot => {
+        const cel = obterCelulaEfetiva(linha, itemSlot.cIdx);
+        if (cel && cel.d && Array.isArray(cel.d)) {
+          cel.d.forEach(cod => {
+            const codNorm = String(cod).trim().toUpperCase();
+            if (codNorm && !todosCodigosSet.has(codNorm)) {
+              todosCodigosSet.add(codNorm);
+              todosCodigos.push(codNorm);
+            }
+          });
+        }
+      });
+    });
+
+    // 4b. Salas abaixo da rolagem vertical
+    salasForaViewport.forEach(itemSala => {
+      const linha = matrizGrade[itemSala.rIdx] || [];
+      slotsAtivos.forEach(itemSlot => {
+        const cel = obterCelulaEfetiva(linha, itemSlot.cIdx);
+        if (cel && cel.d && Array.isArray(cel.d)) {
+          cel.d.forEach(cod => {
+            const codNorm = String(cod).trim().toUpperCase();
+            if (codNorm && !todosCodigosSet.has(codNorm)) {
+              todosCodigosSet.add(codNorm);
+              todosCodigos.push(codNorm);
+            }
+          });
+        }
+      });
+    });
+
+    // 4c. Salas filtradas fora da grade
     matrizGrade.forEach(linha => {
       if (!Array.isArray(linha)) return;
       linha.forEach(cel => {
@@ -2974,6 +3086,24 @@
         });
       }
     });
+
+    // Atualiza as células (TDs) que agora tiveram todas as suas disciplinas carregadas
+    const tdsPendentes = containerGrade.querySelectorAll('td.celula-aula-pendente[data-codigos]');
+    tdsPendentes.forEach(td => {
+      const codigosRaw = td.getAttribute('data-codigos') || '';
+      const codigosArr = codigosRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      if (codigosArr.length > 0) {
+        const todasProntas = codigosArr.every(c => Boolean(obterCacheJupiter(c)));
+        if (todasProntas) {
+          td.classList.remove('celula-aula-pendente');
+          td.classList.add('celula-carregada');
+          td.classList.add('celula-recem-carregada');
+          setTimeout(() => {
+            td.classList.remove('celula-recem-carregada');
+          }, 600);
+        }
+      }
+    });
   }
 
   /**
@@ -3007,17 +3137,8 @@
 
       if (!codigo) return;
 
-      // Se os dados desta disciplina ainda não foram carregados:
-      // Mantém a setinha presente e permite a navegação direta para o link externo (Jupiterweb ou Janus)
-      const dados = obterCacheJupiter(codigo);
-      if (!dados && !link.classList.contains('link-disc-enriquecido')) {
-        if (typeof enfileirarJupiter === 'function') {
-          enfileirarJupiter(codigo, 1);
-        }
-        return;
-      }
-
-      // Dados já carregados: impede navegação externa e abre o Card Modal Elegante
+      // Abre o Card Modal Elegante (se dados já carregados, exibe direto;
+      // se ainda pendente, abre com skeleton e promove para Prioridade 0 urgente na fila)
       e.preventDefault();
 
       let turmaRaw = link.getAttribute('data-turma') || '';
@@ -3049,20 +3170,17 @@
             }
           }
           if (codigo) {
-            const dados = obterCacheJupiter(codigo);
-            if (dados || link.classList.contains('link-disc-enriquecido')) {
-              e.preventDefault();
-              let turmaRaw = link.getAttribute('data-turma') || '';
-              if (!turmaRaw) {
-                const td = link.closest('td');
-                if (td) {
-                  const matchT = (td.textContent || '').match(/\bT(\d{1,2})\b/gi);
-                  if (matchT) turmaRaw = matchT.map(t => t.replace(/T/i, '')).join(',');
-                }
+            e.preventDefault();
+            let turmaRaw = link.getAttribute('data-turma') || '';
+            if (!turmaRaw) {
+              const td = link.closest('td');
+              if (td) {
+                const matchT = (td.textContent || '').match(/\bT(\d{1,2})\b/gi);
+                if (matchT) turmaRaw = matchT.map(t => t.replace(/T/i, '')).join(',');
               }
-              const turmas = turmaRaw ? turmaRaw.split(',').filter(Boolean) : [];
-              abrirCardDisciplina(codigo, turmas, link);
             }
+            const turmas = turmaRaw ? turmaRaw.split(',').filter(Boolean) : [];
+            abrirCardDisciplina(codigo, turmas, link);
           }
         }
       }
@@ -3489,7 +3607,9 @@
 
     containerGrade.addEventListener('scroll', function() {
       if (jupiterTimerDebounceScroll) clearTimeout(jupiterTimerDebounceScroll);
-      jupiterTimerDebounceScroll = setTimeout(extrairCodigosVisiveisEAgendar, 350);
+      jupiterTimerDebounceScroll = setTimeout(() => {
+        extrairCodigosVisiveisEAgendar();
+      }, 150);
     }, { passive: true });
   }
 </script>

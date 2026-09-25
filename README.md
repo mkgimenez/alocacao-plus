@@ -24,13 +24,14 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
   - **Blocos e Salas:** Reconhecimento automático dos blocos didáticos (`Bloco A`, `Bloco C`, `Laranja`, `Anfiteatros`, etc.).
   - **Capacidade Mínima:** Filtros numéricos e atalhos rápidos (`30+`, `50+`, `80+` lugares).
   - **🚪 Modo Salas Livres:** Identifica instantaneamente quais salas estão desocupadas no intervalo selecionado.
-- **🔍 Busca Inteligente:** Pesquisa por código de disciplina, nome de docente ou termos livres, com alternância de foco em colunas com resultado.
+- **🔍 Busca Inteligente & Autocomplete:** Pesquisa multicritério por código de disciplina, nome de docente, modalidade, local de aula ou termos livres, com popover de autocomplete para departamentos da EESC/USP, disciplinas troncais e docentes.
+- **🎨 Coloração Progressiva da Grade:** Células iniciam com estilo neutro e suave (`.celula-aula-pendente`), transitando para as cores oficiais (azul céu para graduação e azul cobalto para pós-graduação) conforme os lotes são carregados ao vivo em segundo plano.
+- **📐 Fila Inteligente com Viewport 2D:** O worker em segundo plano prioriza estritamente as células visíveis na tela (interseção 2D de salas e horários visíveis) em ordem natural de leitura, com reordenação dinâmica na rolagem da grade (debounce de 150ms) e promoção imediata (Prioridade 0) com card *skeleton* no clique.
 - **🔗 Integração e Enriquecimento com Portais Acadêmicos da USP:**
-  - **Graduação (Jupiterweb):** Enriquecimento progressivo assíncrono em segundo plano (*background worker* com 0ms de impacto na grade):
-    - **No Hover:** Exibe o nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`).
-    - **No Clique:** Abre um **Card Modal Elegante** com seleção de turmas por pills, horários oficiais com docentes e observações.
-    - **Acesso Externo:** Hiperlinks para a página completa no [Jupiterweb](https://uspdigital.usp.br/jupiterweb/) preservados com `Ctrl+Clique` ou botão do meio.
-  - **Pós-Graduação (Janus):** Hiperlinks diretos para o sistema [Janus](https://uspdigital.usp.br/janus/).
+  - **Graduação (Jupiterweb) & Pós-Graduação (Janus):** Enriquecimento progressivo assíncrono em segundo plano (*background worker* com 0ms de impacto no tempo de carga da grade):
+    - **No Hover:** Exibe o nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`) e informações de oferecimento.
+    - **No Clique:** Abre instantaneamente o **Card Modal Elegante** com estado de carregamento (*skeleton shimmer*), seleção de turmas por pills, horários oficiais, distribuição de vagas, docentes e observações.
+    - **Acesso Externo:** Botões dedicados no rodapé do modal ("*Abrir no Jupiterweb ↗*" / "*Abrir no Janus ↗*") para consulta direta aos portais oficiais em nova aba.
 - **⚙️ Parametrização sem Código:** A equipe acadêmica pode alternar IDs de planilhas e tempos de cache via aba `_Config` sem tocar no código-fonte.
 
 ---
@@ -66,10 +67,15 @@ alocacao-plus/
 │
 ├── tests/                         # Suíte de testes automatizados e fixtures
 │   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
-│   ├── test_jupiter_parser.py     # Testes do parser HTML e fuzzing sintético
+│   ├── test_cell_coloring_logic.py # Validação de coloração progressiva e classes CSS
+│   ├── test_queue_logic.py        # Fila 2D de viewport, reordenação em scroll e concorrência
+│   ├── test_autocomplete_logic.py # Popover de autocomplete e busca semântica
+│   ├── test_search_filter.py      # Busca multicritério resiliente
+│   ├── test_jupiter_parser.py     # Parser HTML do Jupiterweb e fuzzing sintético
+│   ├── test_janus_parser.py       # Parser HTML do Janus (Pós-Graduação) e TurmaDet
 │   ├── test_turma_matching.py     # Casamento de turmas e property fuzzing
-│   ├── test_queue_logic.py        # Máquina de estados da fila, priorização e concorrência
-│   └── fixtures/                  # Documentos HTML reais salvos do Jupiterweb
+│   ├── test_lote_disciplinas.py   # Processamento em lote misto e tolerância a falhas
+│   └── fixtures/                  # Documentos HTML reais salvos do Jupiterweb e Janus
 │
 ├── tools/                         # Utilitários locais de diagnóstico e automação
 │   ├── gas_sync.py                # Sincronizador Apps Script REST API v1 e CLI de versão
@@ -165,8 +171,8 @@ O projeto conta com uma suíte de testes unitários e testes baseados em proprie
 python tests/run_all_tests.py
 ```
 
-- **Cobertura Completa:** Parser HTML do Jupiterweb, decodificação `ISO-8859-1`, casamento de turmas complexas (`T1`, `T1 e T2`, `pv/tv`, eventos) e controle estrito de concorrência da fila assíncrona (1 requisição simultânea em voo).
-- **Resiliência e Estabilidade:** Mais de 2.200 iterações estocásticas de fuzzing para garantir imunidade a HTMLs corrompidos, variações de layout e picos de concorrência.
+- **Cobertura Completa (72 testes):** Parsers HTML do Jupiterweb e Janus (Pós-Graduação), coloração progressiva, fila prioritária com Viewport 2D, reordenação em scroll, autocomplete semântico, casamento de turmas complexas (`T1`, `T1 e T2`, `pv/tv`, eventos) e controle estrito de concorrência (1 requisição simultânea em voo).
+- **Resiliência e Estabilidade:** Mais de 3.700 iterações estocásticas de fuzzing para garantir imunidade a HTMLs corrompidos, variações de layout, falhas de rede e picos de concorrência.
 
 ---
 

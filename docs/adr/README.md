@@ -24,6 +24,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0014](0014-padronizacao-botoes-e-micro-animacoes-tateis.md) | Padronização Visual de Botões e Micro-Animações Táteis ("Efeitos Fofinhos") | **Aceito** | 2026-09-24 |
 | [0015](0015-enriquecimento-progressivo-janus.md) | Enriquecimento Progressivo de Disciplinas com Dados do Janus (Pós-Graduação) | **Aceito** | 2026-09-24 |
 | [0016](0016-autocomplete-inteligente-campo-busca.md) | Autocomplete Inteligente no Campo de Busca (Departamentos & Docentes) | **Aceito** | 2026-09-24 |
+| [0017](0017-coloracao-progressiva-e-priorizacao-viewport-2d.md) | Coloração Progressiva da Grade, Priorização Geométrica no Viewport 2D e Consolidação do Card Modal | **Aceito** | 2026-09-25 |
 
 ---
 

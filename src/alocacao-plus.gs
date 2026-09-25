@@ -980,7 +980,7 @@ function formatarTextoComLinksHtml(textoOriginal, urlJupiter, urlJanus) {
     const linkUrl = baseUrl + encodeURIComponent(item.codigo);
     const classeCss = item.ehPos ? 'link-disc link-pos' : 'link-disc link-grad';
     const sistemaNome = item.ehPos ? 'Janus (Pós-Graduação USP)' : 'Jupiterweb (Graduação USP)';
-    const titulo = 'Consultar ' + item.codigo + ' no ' + sistemaNome + ' • Abre em nova aba ↗';
+    const titulo = 'Consultar ' + item.codigo + ' (' + sistemaNome + ') • Clique para ver detalhes';
     const attrData = ' data-codigo="' + escapeHtml(item.codigo) + '" role="button" tabindex="0"';
 
     htmlResult += '<a href="' + linkUrl + '" target="_blank" rel="noopener noreferrer" class="' + classeCss + '"' + attrData + ' title="' + escapeHtml(titulo) + '">' + escapeHtml(item.textoEncontrado) + '</a>';

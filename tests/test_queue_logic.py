@@ -63,17 +63,26 @@ class GerenciadorFilaJupiter:
             if item["codigo"] == codigo:
                 if prioridade < item["prioridade"]:
                     item["prioridade"] = prioridade
+                    if prioridade == 0:
+                        self._contador_ordem -= 1
+                        item["ordem"] = self._contador_ordem
                     self._reordenar_fila()
                 if prioridade == 0:
                     self.callbacks_urgentes.add(codigo)
                 return True
 
         # Novo item
-        self._contador_ordem += 1
+        if prioridade == 0:
+            self._contador_ordem -= 1
+            ordem = self._contador_ordem
+        else:
+            self._contador_ordem += 1
+            ordem = self._contador_ordem
+
         self.fila.append({
             "codigo": codigo,
             "prioridade": prioridade,
-            "ordem": self._contador_ordem
+            "ordem": ordem
         })
         if prioridade == 0:
             self.callbacks_urgentes.add(codigo)
@@ -89,63 +98,73 @@ class GerenciadorFilaJupiter:
         """
         Reavalia prioridades da fila com base nos elementos visíveis na grade.
         Prioridade 0 (urgente) é preservada.
-        Visíveis recebem Prioridade 1.
-        Ocultos recebem Prioridade 2.
-        Novos códigos visíveis são enfileirados automaticamente com Prioridade 1.
+        Visíveis recebem Prioridade 1 e posição visual relativa.
+        Ocultos recebem Prioridade 2 e posição oculta.
         """
-        # Preserva a ordem original de inserção
-        lista_visiveis = []
-        set_visiveis = set()
+        mapa_pos_visual = {}
         for c in (codigos_visiveis or []):
             if c and isinstance(c, str):
                 cn = c.strip().upper()
-                if cn and cn not in set_visiveis:
-                    set_visiveis.add(cn)
-                    lista_visiveis.append(cn)
+                if cn and cn not in mapa_pos_visual:
+                    mapa_pos_visual[cn] = len(mapa_pos_visual)
+
+        mapa_pos_oculta = {}
+        lista_ocultos = []
+        for c in (todos_codigos or []):
+            if c and isinstance(c, str):
+                cn = c.strip().upper()
+                if cn and cn not in mapa_pos_visual and cn not in mapa_pos_oculta:
+                    mapa_pos_oculta[cn] = len(mapa_pos_oculta)
+                    lista_ocultos.append(cn)
 
         # Atualiza itens já existentes na fila
         for item in self.fila:
             if item["prioridade"] == 0:
                 continue  # Preserva prioridade urgente
-            if item["codigo"] in set_visiveis:
+            if item["codigo"] in mapa_pos_visual:
                 item["prioridade"] = 1
+                item["posicao_visual"] = mapa_pos_visual[item["codigo"]]
             else:
                 item["prioridade"] = 2
+                item["posicao_oculta"] = mapa_pos_oculta.get(item["codigo"], 99999)
 
-        # Adiciona novos códigos visíveis ainda não presentes (preservando ordem)
-        for cod in lista_visiveis:
+        # Adiciona novos códigos visíveis ainda não presentes (com Prioridade 1)
+        for cod, pos_vis in mapa_pos_visual.items():
             if not self.esta_em_cache(cod) and not (self.em_voo and cod in self.lote_atual):
                 if not any(item["codigo"] == cod for item in self.fila):
                     self._contador_ordem += 1
                     self.fila.append({
                         "codigo": cod,
                         "prioridade": 1,
+                        "posicao_visual": pos_vis,
                         "ordem": self._contador_ordem
                     })
 
-        # Adiciona demais códigos como prioridade 2 se informados (preservando ordem)
-        if todos_codigos:
-            vistos_todos = set()
-            for cod_raw in todos_codigos:
-                if not cod_raw or not isinstance(cod_raw, str):
-                    continue
-                cod = cod_raw.strip().upper()
-                if cod and cod not in set_visiveis and cod not in vistos_todos and not self.esta_em_cache(cod):
-                    vistos_todos.add(cod)
-                    if not (self.em_voo and cod in self.lote_atual):
-                        if not any(item["codigo"] == cod for item in self.fila):
-                            self._contador_ordem += 1
-                            self.fila.append({
-                                "codigo": cod,
-                                "prioridade": 2,
-                                "ordem": self._contador_ordem
-                            })
+        # Adiciona demais códigos como prioridade 2 se informados
+        for cod in lista_ocultos:
+            if not self.esta_em_cache(cod) and not (self.em_voo and cod in self.lote_atual):
+                if not any(item["codigo"] == cod for item in self.fila):
+                    self._contador_ordem += 1
+                    self.fila.append({
+                        "codigo": cod,
+                        "prioridade": 2,
+                        "posicao_oculta": mapa_pos_oculta[cod],
+                        "ordem": self._contador_ordem
+                    })
 
         self._reordenar_fila()
 
     def _reordenar_fila(self):
-        """Ordena fila por prioridade ascendente (0, 1, 2) e depois por ordem de inserção FIFO."""
-        self.fila.sort(key=lambda x: (x["prioridade"], x["ordem"]))
+        """Ordena fila por prioridade ascendente (0, 1, 2) e depois por ordem visual ou FIFO."""
+        def chave_ordenacao(x):
+            prio = x["prioridade"]
+            if prio == 1:
+                return (prio, x.get("posicao_visual", 99999), x["ordem"])
+            elif prio == 2:
+                return (prio, x.get("posicao_oculta", 99999), x["ordem"])
+            return (prio, 0, x["ordem"])
+
+        self.fila.sort(key=chave_ordenacao)
 
     def proximo_lote(self):
         """
@@ -354,6 +373,32 @@ class TestQueueLogic(unittest.TestCase):
         codigos_ordenados = [item["codigo"] for item in self.gerenciador.fila]
         self.assertEqual(codigos_ordenados[:2], ["DISC_3", "DISC_4"])
         self.assertEqual(codigos_ordenados[2:], ["DISC_1", "DISC_2"])
+
+    def test_reordenacao_ordem_visual_viewport_2d(self):
+        """Valida que elementos dentro do Viewport 2D respeitam rigorosamente a ordem visual geométrica."""
+        # Suponha 4 disciplinas já presentes na fila:
+        # DISC_A e DISC_B na sala 1; DISC_C e DISC_D na sala 2
+        self.gerenciador.atualizar_visibilidade(
+            codigos_visiveis=["DISC_A", "DISC_C", "DISC_B", "DISC_D"],
+            todos_codigos=["DISC_A", "DISC_C", "DISC_B", "DISC_D", "DISC_E", "DISC_F"]
+        )
+
+        # A ordem visual deve prevalecer sobre timestamp de inserção
+        ordem_vis = [item["codigo"] for item in self.gerenciador.fila if item["prioridade"] == 1]
+        self.assertEqual(ordem_vis, ["DISC_A", "DISC_C", "DISC_B", "DISC_D"])
+
+        # Usuário rola horizontalmente: DISC_C agora está em primeiro na tela, seguida de DISC_D
+        self.gerenciador.atualizar_visibilidade(
+            codigos_visiveis=["DISC_C", "DISC_D"],
+            todos_codigos=["DISC_A", "DISC_B", "DISC_C", "DISC_D", "DISC_E"]
+        )
+        ordem_nova = [item["codigo"] for item in self.gerenciador.fila]
+        # DISC_C e DISC_D devem liderar a fila com Prioridade 1
+        self.assertEqual(ordem_nova[:2], ["DISC_C", "DISC_D"])
+        self.assertEqual(self.gerenciador.fila[0]["prioridade"], 1)
+        self.assertEqual(self.gerenciador.fila[1]["prioridade"], 1)
+        # As anteriores viram prioridade 2
+        self.assertEqual(self.gerenciador.fila[2]["prioridade"], 2)
 
     def test_tolerancia_e_recuperacao_de_falha_de_rede(self):
         """Testa resiliência se a requisição do lote falhar (ex: timeout do GAS)."""

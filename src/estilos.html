@@ -613,10 +613,16 @@
     .modal-btn-fechar,
     .chip-sugestao,
     .busca-sugestoes-popover,
+    .celula-aula,
+    .celula-pos,
+    .celula-aula-pendente,
     .celula-aula a,
     .celula-pos a,
+    .celula-aula-pendente a,
+    .celula-recem-carregada,
     .link-disc {
       transition: none !important;
+      animation: none !important;
       transform: none !important;
     }
     .chip:hover,
@@ -1401,6 +1407,9 @@
     color: #0369a1;
     font-weight: 500;
     padding: 5px 6px !important;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Estilização Moderna dos Links de Disciplina (Jupiterweb / Janus) */
@@ -1430,24 +1439,6 @@
                 transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  /* Ícone indicador visual de link externo (nova aba) */
-  .celula-aula a::after,
-  .celula-pos a::after,
-  .link-disc::after {
-    content: '\00a0↗';
-    font-size: 9.5px;
-    font-weight: 600;
-    opacity: 0.65;
-    display: inline-block;
-    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease;
-  }
-
-  .celula-aula a:hover::after,
-  .celula-pos a:hover::after,
-  .link-disc:hover::after {
-    opacity: 1;
-    transform: translate(1px, -1px);
-  }
 
   /* Disciplinas de Graduação (Jupiterweb) - Azul Céu / Cerúleo */
   .celula-aula a,
@@ -1484,6 +1475,9 @@
     background-color: #eef2ff !important;
     border-color: #c7d2fe !important;
     color: #1e3a8a !important;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .celula-pos a,
@@ -1513,6 +1507,66 @@
   .link-pos:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.35);
+  }
+
+  /* ==========================================================================
+     Células com Carregamento Pendente (Sem as tonalidades de azul)
+     Iniciam com cores neutras até que os dados do card flutuante sejam carregados
+     ========================================================================== */
+  .celula-grade.celula-aula-pendente,
+  .tabela-grade tbody td.celula-aula-pendente {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #475569 !important;
+    font-weight: 500;
+    padding: 5px 6px !important;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tabela-grade tbody td.dia-impar.celula-aula-pendente {
+    background-color: #f8fafc !important;
+  }
+
+  .tabela-grade tbody tr:hover td.celula-aula-pendente {
+    background-color: #f1f5f9 !important;
+  }
+
+  /* Links e Badges de disciplinas enquanto o card flutuante estiver na fila */
+  .celula-aula-pendente a:not(.link-disc-enriquecido),
+  .celula-aula-pendente .link-disc:not(.link-disc-enriquecido) {
+    color: #475569 !important;
+    background-color: rgba(100, 116, 139, 0.08) !important;
+    border: 1px solid rgba(148, 163, 184, 0.35) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .celula-aula-pendente a:hover:not(.link-disc-enriquecido),
+  .celula-aula-pendente .link-disc:hover:not(.link-disc-enriquecido) {
+    color: #1e293b !important;
+    background-color: rgba(100, 116, 139, 0.16) !important;
+    border-color: rgba(100, 116, 139, 0.45) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Micro-animação suave quando a célula adquire suas cores ao vivo */
+  @keyframes celulaCarregadaFlash {
+    0% {
+      filter: brightness(1.08);
+    }
+    100% {
+      filter: brightness(1);
+    }
+  }
+
+  .celula-grade.celula-recem-carregada {
+    animation: celulaCarregadaFlash 0.5s ease-out;
   }
 
   /* Célula Destacada pela Busca Textual */
@@ -1623,8 +1677,9 @@
     font-size: 11px;
     color: var(--text-subtle);
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
+    text-align: center;
   }
 
   /* --------------------------------------------------------------------------
@@ -1750,7 +1805,7 @@
      -------------------------------------------------------------------------- */
   .app-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
@@ -1759,6 +1814,7 @@
     color: var(--text-muted);
     background: #f8fafc;
     border-top: 1px solid var(--border);
+    text-align: center;
   }
 
   .badge-versao {
@@ -2309,17 +2365,6 @@
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-  }
-
-  .link-disc.link-disc-enriquecido::after,
-  .celula-aula a.link-disc-enriquecido::after,
-  .celula-pos a.link-disc-enriquecido::after,
-  .link-disc-enriquecido::after,
-  .link-disc.link-disc-enriquecido:hover::after,
-  .celula-aula a.link-disc-enriquecido:hover::after,
-  .link-disc-enriquecido:hover::after {
-    content: none !important;
-    display: none !important;
   }
 
   @media (max-width: 540px) {
