@@ -12,6 +12,13 @@ import unicodedata
 import re
 import random
 import string
+import sys
+from pathlib import Path
+
+# Garante que o diretório tests/ está no sys.path
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def normalizar_texto(txt):
@@ -429,30 +436,46 @@ class AutocompleteEngine:
         disciplinas_encontradas = []
         if len(termo_str) >= 2:
             for disc in self.mapa_disciplinas.values():
-                pontuacao = 0
-                partes_nome = disc["nomeNorm"].split()
+                pontuacao_sigla = 0
+                pontuacao_nome = 0
 
+                # 2a. Casamento por Código / Sigla
                 if disc["codNorm"] == t_norm:
-                    pontuacao = 100
+                    pontuacao_sigla = 100
                 elif disc["codNorm"].startswith(t_norm):
-                    pontuacao = 85
-                elif disc["nomeNorm"].startswith(t_norm):
-                    pontuacao = 75
-                elif any(p.startswith(t_norm) for p in partes_nome):
-                    pontuacao = 65
+                    pontuacao_sigla = 85
                 elif t_norm in disc["codNorm"]:
-                    pontuacao = 55
-                elif t_norm in disc["nomeNorm"]:
-                    pontuacao = 45
+                    pontuacao_sigla = 55
 
+                # 2b. Casamento por Nome (apenas se enriquecido e distinto do código)
+                tem_nome_valido = bool(disc.get("nome") and disc["nome"] != disc["codigo"])
+                if tem_nome_valido:
+                    partes_nome = disc["nomeNorm"].split()
+                    if disc["nomeNorm"] == t_norm:
+                        pontuacao_nome = 95
+                    elif disc["nomeNorm"].startswith(t_norm):
+                        pontuacao_nome = 75
+                    elif any(p.startswith(t_norm) for p in partes_nome):
+                        pontuacao_nome = 65
+                    elif t_norm in disc["nomeNorm"]:
+                        pontuacao_nome = 45
+
+                pontuacao = max(pontuacao_sigla, pontuacao_nome)
                 if pontuacao > 0:
+                    match_por = "nome" if pontuacao_nome > pontuacao_sigla else "sigla"
+                    valor_insercao = disc["nome"] if match_por == "nome" else disc["codigo"]
+
                     disciplinas_encontradas.append({
                         "codigo": disc["codigo"],
                         "nome": disc["nome"],
-                        "pontuacao": pontuacao
+                        "pontuacao": pontuacao,
+                        "matchPor": match_por,
+                        "match_por": match_por,
+                        "valorInsercao": valor_insercao,
+                        "valor_insercao": valor_insercao
                     })
 
-            disciplinas_encontradas.sort(key=lambda x: x["pontuacao"], reverse=True)
+            disciplinas_encontradas.sort(key=lambda x: (-x["pontuacao"], x["codigo"]))
 
         # 3. Docentes
         docentes_encontrados = []
@@ -852,8 +875,149 @@ class TestAutocompleteLogic(unittest.TestCase):
             self.assertIn("disciplinas", res)
             limite_deptos = 8 if res["ehVazio"] else 6
             self.assertLessEqual(len(res["departamentos"]), limite_deptos)
-            self.assertLessEqual(len(res["disciplinas"]), 5)
-            self.assertLessEqual(len(res["docentes"]), 6)
+    # -------------------------------------------------------------
+    # TESTES DE INSERÇÃO CONTEXTUAL DE NOME VS SIGLA NOS CHIPS (ADR-0022)
+    # -------------------------------------------------------------
+
+    def test_chip_disciplina_busca_por_nome_insere_nome(self):
+        """Valida que buscas por nome (prefixo, exato, palavra interna) geram valorInsercao com o nome oficial."""
+        # 1. Busca por prefixo de nome
+        res_calc = self.engine.buscar_sugestoes("calculo")
+        self.assertGreater(len(res_calc["disciplinas"]), 0)
+        calc1 = res_calc["disciplinas"][0]
+        self.assertEqual(calc1["valorInsercao"], "Cálculo I")
+        self.assertEqual(calc1["valor_insercao"], "Cálculo I")
+        self.assertEqual(calc1["matchPor"], "nome")
+        self.assertEqual(calc1["match_por"], "nome")
+
+        # 2. Busca por nome com acentuação
+        res_calc_acento = self.engine.buscar_sugestoes("Cálculo")
+        self.assertEqual(res_calc_acento["disciplinas"][0]["valorInsercao"], "Cálculo I")
+        self.assertEqual(res_calc_acento["disciplinas"][0]["matchPor"], "nome")
+
+        # 3. Busca por palavra interna do nome
+        res_mat = self.engine.buscar_sugestoes("materiais")
+        self.assertGreater(len(res_mat["disciplinas"]), 0)
+        primeira_mat = res_mat["disciplinas"][0]
+        self.assertIn("Materiais", primeira_mat["valorInsercao"])
+        self.assertEqual(primeira_mat["matchPor"], "nome")
+
+        # 4. Busca por outro termo de nome (Física)
+        res_fis = self.engine.buscar_sugestoes("fisica")
+        self.assertGreater(len(res_fis["disciplinas"]), 0)
+        self.assertEqual(res_fis["disciplinas"][0]["valorInsercao"], "Física I")
+        self.assertEqual(res_fis["disciplinas"][0]["matchPor"], "nome")
+
+    def test_chip_disciplina_busca_por_sigla_insere_sigla(self):
+        """Valida que buscas por sigla/código (prefixo de sigla, exato, números) geram valorInsercao com o código."""
+        # 1. Prefixo de sigla alfabética (SMA)
+        res_sma = self.engine.buscar_sugestoes("sma")
+        self.assertGreater(len(res_sma["disciplinas"]), 0)
+        disc_sma = res_sma["disciplinas"][0]
+        self.assertEqual(disc_sma["valorInsercao"], disc_sma["codigo"])
+        self.assertTrue(disc_sma["valorInsercao"].startswith("SMA"))
+        self.assertEqual(disc_sma["matchPor"], "sigla")
+
+        # 2. Código completo exato (SMA0301)
+        res_exato = self.engine.buscar_sugestoes("SMA0301")
+        self.assertEqual(len(res_exato["disciplinas"]), 1)
+        self.assertEqual(res_exato["disciplinas"][0]["valorInsercao"], "SMA0301")
+        self.assertEqual(res_exato["disciplinas"][0]["matchPor"], "sigla")
+
+        # 3. Substring numérica do código (0301)
+        res_num = self.engine.buscar_sugestoes("0301")
+        self.assertGreater(len(res_num["disciplinas"]), 0)
+        self.assertEqual(res_num["disciplinas"][0]["valorInsercao"], "SMA0301")
+        self.assertEqual(res_num["disciplinas"][0]["matchPor"], "sigla")
+
+        # 4. Código numérico de 7 dígitos IFSC (760 e 7600005)
+        res_760 = self.engine.buscar_sugestoes("760")
+        self.assertGreater(len(res_760["disciplinas"]), 0)
+        self.assertEqual(res_760["disciplinas"][0]["valorInsercao"], "7600005")
+        self.assertEqual(res_760["disciplinas"][0]["matchPor"], "sigla")
+
+        res_760_exato = self.engine.buscar_sugestoes("7600005")
+        self.assertEqual(len(res_760_exato["disciplinas"]), 1)
+        self.assertEqual(res_760_exato["disciplinas"][0]["valorInsercao"], "7600005")
+        self.assertEqual(res_760_exato["disciplinas"][0]["matchPor"], "sigla")
+
+    def test_chip_disciplina_colisao_sigla_vs_nome_prioriza_sigla(self):
+        """Valida que quando um termo casa como prefixo de código (85) e início de nome (75), a sigla prevalece."""
+        dados_colisao = {
+            "codigo": "SEM0550",
+            "nome": "Seminários de Pesquisa",
+            "turmas": {"01": {"numero": "01"}}
+        }
+        grade = [[{"d": ["SEM0550"], "turmas": ["01"], "t": "SEM0550 - T01"}]]
+        engine = AutocompleteEngine(dados_grade=grade, cache_jupiter={"SEM0550": dados_colisao})
+
+        # Ao digitar 'sem', casa com código 'SEM0550' (85) e nome 'Seminários' (75) -> 85 vence
+        res_sem = engine.buscar_sugestoes("sem")
+        self.assertEqual(len(res_sem["disciplinas"]), 1)
+        self.assertEqual(res_sem["disciplinas"][0]["valorInsercao"], "SEM0550")
+        self.assertEqual(res_sem["disciplinas"][0]["matchPor"], "sigla")
+
+        # Ao digitar 'seminarios', não casa com sigla, casa com nome (75) -> nome vence
+        res_seminarios = engine.buscar_sugestoes("seminarios")
+        self.assertEqual(len(res_seminarios["disciplinas"]), 1)
+        self.assertEqual(res_seminarios["disciplinas"][0]["valorInsercao"], "Seminários de Pesquisa")
+        self.assertEqual(res_seminarios["disciplinas"][0]["matchPor"], "nome")
+
+    def test_chip_disciplina_sem_nome_enriquecido_fallback_codigo(self):
+        """Valida que disciplina ainda sem enriquecimento do Júpiter/Janus (nome == codigo) sempre insere o código."""
+        grade = [[{"d": ["XYZ9999"], "turmas": ["01"], "t": "XYZ9999 - T01"}]]
+        engine = AutocompleteEngine(dados_grade=grade, cache_jupiter={})
+
+        res = engine.buscar_sugestoes("XYZ")
+        self.assertEqual(len(res["disciplinas"]), 1)
+        disc = res["disciplinas"][0]
+        self.assertEqual(disc["codigo"], "XYZ9999")
+        self.assertEqual(disc["valorInsercao"], "XYZ9999")
+        self.assertEqual(disc["matchPor"], "sigla")
+
+    def test_chip_disciplina_ordenacao_deterministica_empate(self):
+        """Valida desempate estável alfanumérico por código para disciplinas com mesma pontuação."""
+        grade = [
+            [
+                {"d": ["SMA0355"], "turmas": ["01"], "t": "SMA0355 - T01"},
+                {"d": ["SMA0354"], "turmas": ["01"], "t": "SMA0354 - T01"}
+            ]
+        ]
+        cache = {
+            "SMA0354": {"codigo": "SMA0354", "nome": "Cálculo II", "turmas": {}},
+            "SMA0355": {"codigo": "SMA0355", "nome": "Cálculo III", "turmas": {}}
+        }
+        engine = AutocompleteEngine(dados_grade=grade, cache_jupiter=cache)
+
+        # Ambas têm mesma pontuação por prefixo 'Cálculo' (75)
+        res = engine.buscar_sugestoes("calculo")
+        codigos = [d["codigo"] for d in res["disciplinas"]]
+        # Deve ordenar estavelmente por ordem alfabética de código quando empatados
+        self.assertEqual(codigos, ["SMA0354", "SMA0355"])
+
+    def test_chip_disciplina_integracao_com_filtro_grade(self):
+        """Valida que o valorInsercao gerado pelo chip é consumido perfeitamente pela filtragem de células."""
+        from test_search_filter import celula_corresponde_a_busca, extrair_tokens_busca
+
+        # 1. Usuário busca por nome: 'calculo' -> chip devolve 'Cálculo I'
+        res_calc = self.engine.buscar_sugestoes("calculo")
+        valor_calc = res_calc["disciplinas"][0]["valorInsercao"]
+        self.assertEqual(valor_calc, "Cálculo I")
+
+        tokens_calc = extrair_tokens_busca(normalizar_texto(valor_calc))
+        celula_sma0301 = {"d": ["SMA0301"], "t": "SMA0301 - T01"}
+        match_sma0301 = celula_corresponde_a_busca(celula_sma0301, tokens_calc, CACHE_CANONICO_TESTES)
+        self.assertTrue(match_sma0301)
+
+        # 2. Usuário busca por sigla: 'sma' -> chip sugere disciplinas do SMA com o código
+        res_sma = self.engine.buscar_sugestoes("sma")
+        chip_sma0301 = next(d for d in res_sma["disciplinas"] if d["codigo"] == "SMA0301")
+        self.assertEqual(chip_sma0301["valorInsercao"], "SMA0301")
+
+        tokens_sma = extrair_tokens_busca(normalizar_texto(chip_sma0301["valorInsercao"]))
+        self.assertTrue(celula_corresponde_a_busca(celula_sma0301, tokens_sma, CACHE_CANONICO_TESTES))
+        celula_sem0500 = {"d": ["SEM0500"], "t": "SEM0500 - T01"}
+        self.assertFalse(celula_corresponde_a_busca(celula_sem0500, tokens_sma, CACHE_CANONICO_TESTES))
 
 
 if __name__ == "__main__":

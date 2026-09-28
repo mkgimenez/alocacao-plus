@@ -1573,33 +1573,49 @@
     const disciplinasEncontradas = [];
     if (termoStr.length >= 2) {
       mapaDisciplinasIndexadas.forEach(disc => {
-        let pontuacao = 0;
-        const partesNome = disc.nomeNorm.split(/\s+/);
+        let pontuacaoSigla = 0;
+        let pontuacaoNome = 0;
 
+        // 2a. Casamento por Código / Sigla
         if (disc.codNorm === tNorm) {
-          pontuacao = 100;
+          pontuacaoSigla = 100;
         } else if (disc.codNorm.startsWith(tNorm)) {
-          pontuacao = 85;
-        } else if (disc.nomeNorm.startsWith(tNorm)) {
-          pontuacao = 75;
-        } else if (partesNome.some(p => p.startsWith(tNorm))) {
-          pontuacao = 65;
+          pontuacaoSigla = 85;
         } else if (disc.codNorm.includes(tNorm)) {
-          pontuacao = 55;
-        } else if (disc.nomeNorm.includes(tNorm)) {
-          pontuacao = 45;
+          pontuacaoSigla = 55;
         }
 
+        // 2b. Casamento por Nome (apenas se enriquecido e distinto do código)
+        const temNomeValido = disc.nome && disc.nome !== disc.codigo;
+        if (temNomeValido) {
+          const partesNome = disc.nomeNorm.split(/\s+/);
+          if (disc.nomeNorm === tNorm) {
+            pontuacaoNome = 95;
+          } else if (disc.nomeNorm.startsWith(tNorm)) {
+            pontuacaoNome = 75;
+          } else if (partesNome.some(p => p.startsWith(tNorm))) {
+            pontuacaoNome = 65;
+          } else if (disc.nomeNorm.includes(tNorm)) {
+            pontuacaoNome = 45;
+          }
+        }
+
+        const pontuacao = Math.max(pontuacaoSigla, pontuacaoNome);
         if (pontuacao > 0) {
+          const matchPor = pontuacaoNome > pontuacaoSigla ? 'nome' : 'sigla';
+          const valorInsercao = matchPor === 'nome' ? disc.nome : disc.codigo;
+
           disciplinasEncontradas.push({
             codigo: disc.codigo,
             nome: disc.nome,
-            pontuacao: pontuacao
+            pontuacao: pontuacao,
+            matchPor: matchPor,
+            valorInsercao: valorInsercao
           });
         }
       });
 
-      disciplinasEncontradas.sort((a, b) => b.pontuacao - a.pontuacao);
+      disciplinasEncontradas.sort((a, b) => b.pontuacao - a.pontuacao || a.codigo.localeCompare(b.codigo));
     }
 
     // 3. Docentes
@@ -1712,12 +1728,24 @@
             <span class="sugestoes-secao-count">${res.disciplinas.length}</span>
           </div>
           <div class="sugestoes-chips-grid">
-            ${res.disciplinas.map(disc => `
-              <button type="button" class="chip-sugestao chip-disciplina" data-valor="${disc.codigo}" data-tipo="disciplina" title="Filtrar por ${escapeHtml(disc.codigo)} — ${escapeHtml(disc.nome)}">
-                <span class="chip-sugestao-sigla">${disc.codigo}</span>
-                <span class="chip-sugestao-rotulo">${escapeHtml(disc.nome)}</span>
-              </button>
-            `).join('')}
+            ${res.disciplinas.map(disc => {
+              const valorIns = disc.valorInsercao || disc.codigo;
+              const temNome = disc.nome && disc.nome !== disc.codigo;
+              const tooltip = temNome 
+                ? `Filtrar por ${escapeHtml(valorIns)} (${escapeHtml(disc.codigo)})`
+                : `Filtrar por ${escapeHtml(valorIns)}`;
+
+              return `
+                <button type="button" 
+                        class="chip-sugestao chip-disciplina" 
+                        data-valor="${escapeHtml(valorIns)}" 
+                        data-tipo="disciplina" 
+                        title="${tooltip}">
+                  <span class="chip-sugestao-sigla">${escapeHtml(disc.codigo)}</span>
+                  <span class="chip-sugestao-rotulo">${escapeHtml(disc.nome)}</span>
+                </button>
+              `;
+            }).join('')}
           </div>
         </div>
       `;

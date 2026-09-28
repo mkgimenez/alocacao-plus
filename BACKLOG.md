@@ -69,6 +69,14 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.7.1:** Inserção Contextual de Nome vs. Sigla nos Chips de Disciplinas do Autocomplete:
+  - **Inserção Contextual no Campo de Busca:** Ao clicar ou teclar `Enter` em um chip de disciplina sugerido a partir de busca textual por nome (ex: *"Cálculo"*, *"Resistência"*, *"Física"*), o campo de pesquisa é preenchido com o nome oficial da disciplina (ex: *"Cálculo I"*, *"Resistência dos Materiais I"*) em vez de substituir abruptamente pela sigla;
+  - **Preservação da Busca por Sigla/Código:** Buscas iniciadas por prefixos de departamentos (`"SMA"`, `"SET"`, `"SEM"`), códigos alfanuméricos completos (`"SMA0301"`, `"SET0188"`), substrings numéricas (`"0301"`) ou códigos numéricos do IFSC (`"760"`, `"7600005"`) mantêm o preenchimento exato da sigla;
+  - **Escala Dual de Relevância e Desempate Determinístico:** Implementação de cálculo desacoplado (`pontuacaoSigla` vs `pontuacaoNome`) com faixas intercaladas não sobrepostas ({100, 85, 55} vs {95, 75, 65, 45}) e critério estável de ordenação por código alfanumérico em caso de empate;
+  - **Resiliência e Fallback Seguro:** Fallback automático para a sigla quando a disciplina ainda não foi enriquecida no cache (`nome == codigo`), com proteção contra quebras de atributos no DOM via `escapeHtml()`;
+  - **Refinamento de Tooltips:** Eliminação de repetições redundantes no atributo `title` do chip (`Filtrar por <VALOR> (<CÓDIGO>)`);
+  - **Qualidade & Testes Automatizados:** Expansão da suíte `tests/test_autocomplete_logic.py` totalizando 113 testes automatizados (100% de sucesso);
+  - **Governança:** Registrado no ADR 0022.
 - [x] **v1.7.0:** Pesquisa Inteligente de Troca de Sala (Modo Salas Livres Automatizado) & Refinamentos de Layout:
   - **Ação Rápida no Card Modal:** Adicionado o botão `Trocar de Sala ⇄` (`U+21C4`) posicionado em segundo lugar no rodapé do modal (logo após o link do Júpiter/Janus), em conformidade visual com o Design System (`docs/padroes-interface-botoes.md`);
   - **Otimização de Espaço Horizontal:** Encurtamento do botão de filtro de disciplina para `Filtrar <DISCIPLINA>` (ex: *Filtrar SMA0356*), economizando mais de 60px horizontais e acomodando todos os 4 botões na mesma linha no desktop;
