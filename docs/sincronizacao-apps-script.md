@@ -177,6 +177,26 @@ A anotação é gravada imediatamente na seção **`📥 Inbox`** do arquivo [`B
 
 ---
 
+### 5.7. Implantação e Publicação de Versão (`deploy`)
+
+Para criar uma nova versão imutável do projeto no Apps Script e atualizar a implantação de produção do Web App (URL pública) em um único comando:
+
+```powershell
+# Atualiza a implantação de trabalho usando a versão atual (ex: v1.9.1 (build 0))
+python tools/gas_sync.py deploy
+
+# Ou fornecendo uma descrição personalizada para a versão
+python tools/gas_sync.py deploy "v1.9.1 - Impressão da grade e padronização de botões"
+```
+
+**Como opera:**
+1. Cria uma nova versão numerada no histórico do Apps Script vinculada à descrição fornecida.
+2. Localiza a implantação ativa do Web App.
+3. Atualiza atomicamente a configuração da implantação (`versionNumber`), disponibilizando a nova versão aos usuários finais instantaneamente e sem alterar a URL pública.
+
+---
+
+
 ## 6. Mapeamento de Arquivos Local $\leftrightarrow$ Nuvem
 
 O Google Apps Script trata arquivos sem extensão e com tipos formais. O `gas_sync.py` realiza essa tradução de forma transparente:
