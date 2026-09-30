@@ -1902,28 +1902,145 @@
   // --------------------------------------------------------------------------
   // Renderização da Grade e Aplicação de Filtros Reativa no Navegador
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Resolução Temporal Inteligente de Horários e Intervalos da Grade
+  // --------------------------------------------------------------------------
   /**
-   * Identifica o índice do slot correspondente ao dia e horário corrente
-   * @param {Array} slotsAtivos - Lista dos slots atualmente visíveis na grade
-   * @returns {number} Índice do slot em slotsAtivos ou -1 caso fora do horário letivo/dia
+   * Converte minutos restantes em texto conciso e legível para tooltips e badges.
+   * @param {number} minutos - Quantidade de minutos restantes
+   * @returns {string} Ex: 'em 5 min', 'em 1h 20min', 'em 2h'
    */
-  function obterIndiceSlotAtual(slotsAtivos) {
-    if (!slotsAtivos || slotsAtivos.length === 0) return -1;
-    const agora = new Date();
+  function formatarTempoRestanteGrade(minutos) {
+    if (minutos <= 0) return '';
+    if (minutos < 60) return `em ${minutos} min`;
+    const h = Math.floor(minutos / 60);
+    const m = minutos % 60;
+    return m === 0 ? `em ${h}h` : `em ${h}h ${m}min`;
+  }
+
+  /**
+   * Determina com precisão temporal o estado atual da grade (aula, intervalo ou pré/pós-expediente).
+   * Protegido contra falsos intervalos em grades filtradas por busca ou horário.
+   *
+   * @param {Array} slotsAtivos - Colunas visíveis na grade [{ slot, cIdx }]
+   * @param {Array} [todosSlots] - Grade mestra completa de slots do campus (dados.slots)
+   * @param {Date} [agoraCustom] - Objeto Date opcional para injeção de dependência e testes
+   * @returns {Object} { tipo, idxSlot, slot, textoTooltip, icone, tagLabel }
+   */
+  function obterEstadoTemporalGrade(slotsAtivos, todosSlots = null, agoraCustom = null) {
+    if (!slotsAtivos || slotsAtivos.length === 0) {
+      return { tipo: 'fora_dia', idxSlot: -1, slot: null, textoTooltip: '', icone: '', tagLabel: '' };
+    }
+
+    const agora = agoraCustom || new Date();
     const diaNum = agora.getDay();
-    // Mapeamento dos dias letivos reais (1: Seg ... 6: Sáb)
     const mapaDiaReal = { 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
     const chaveDiaHoje = mapaDiaReal[diaNum];
-    if (!chaveDiaHoje) return -1;
+    if (!chaveDiaHoje) {
+      return { tipo: 'fora_dia', idxSlot: -1, slot: null, textoTooltip: '', icone: '', tagLabel: '' };
+    }
 
     const agoraMin = agora.getHours() * 60 + agora.getMinutes();
 
-    return slotsAtivos.findIndex(item => {
-      const s = item.slot;
-      if (!s || s.dia !== chaveDiaHoje) return false;
-      if (s.horaInicioMin === null || s.horaFimMin === null) return false;
-      return agoraMin >= s.horaInicioMin && agoraMin < s.horaFimMin;
+    // 1. Grade mestra do dia (evita falsos intervalos se slots estiverem filtrados)
+    const fonteMestra = (todosSlots && todosSlots.length > 0) ? todosSlots : slotsAtivos.map(item => item.slot);
+    const slotsMestreHoje = [];
+    fonteMestra.forEach(s => {
+      if (s && s.dia === chaveDiaHoje && s.horaInicioMin !== null && s.horaFimMin !== null) {
+        slotsMestreHoje.push(s);
+      }
     });
+
+    if (slotsMestreHoje.length === 0) {
+      return { tipo: 'fora_dia', idxSlot: -1, slot: null, textoTooltip: '', icone: '', tagLabel: '' };
+    }
+    slotsMestreHoje.sort((a, b) => a.horaInicioMin - b.horaInicioMin);
+
+    // Mapeia os slots visíveis de hoje preservando seu índice original em slotsAtivos
+    const slotsVisiveisHoje = [];
+    slotsAtivos.forEach((item, idx) => {
+      const s = item.slot;
+      if (s && s.dia === chaveDiaHoje && s.horaInicioMin !== null) {
+        slotsVisiveisHoje.push({ idx: idx, slot: s });
+      }
+    });
+    slotsVisiveisHoje.sort((a, b) => a.slot.horaInicioMin - b.slot.horaInicioMin);
+
+    // 2. Verifica se a universidade está em horário de aula neste momento
+    let slotAulaMestre = null;
+    for (let i = 0; i < slotsMestreHoje.length; i++) {
+      const s = slotsMestreHoje[i];
+      if (agoraMin >= s.horaInicioMin && agoraMin < s.horaFimMin) {
+        slotAulaMestre = s;
+        break;
+      }
+    }
+
+    if (slotAulaMestre) {
+      const itemVisivel = slotsVisiveisHoje.find(item => item.slot.horaInicioMin === slotAulaMestre.horaInicioMin);
+      const idxVisivel = itemVisivel ? itemVisivel.idx : -1;
+      const rotulo = slotAulaMestre.label || slotAulaMestre.textoInicio;
+      return {
+        tipo: 'aula',
+        idxSlot: idxVisivel,
+        slot: itemVisivel ? itemVisivel.slot : null,
+        textoTooltip: idxVisivel !== -1 ? `${rotulo} (Horário Atual em Andamento)` : '',
+        icone: idxVisivel !== -1 ? '⚡ ' : '',
+        tagLabel: ''
+      };
+    }
+
+    // 3. Antes da primeira aula do dia na universidade (Pré-Expediente)
+    const primeiroMestre = slotsMestreHoje[0];
+    if (agoraMin < primeiroMestre.horaInicioMin) {
+      const diff = primeiroMestre.horaInicioMin - agoraMin;
+      const primeiroVisivel = slotsVisiveisHoje[0] || null;
+      const idxVisivel = primeiroVisivel ? primeiroVisivel.idx : -1;
+      const slotAlvo = primeiroVisivel ? primeiroVisivel.slot : null;
+      const rotulo = slotAlvo ? (slotAlvo.label || slotAlvo.textoInicio) : '';
+      const txtInicio = slotAlvo ? (slotAlvo.textoInicio || '') : '';
+      const infoTempo = formatarTempoRestanteGrade(diff);
+      const infoFmt = infoTempo ? ` (${infoTempo})` : '';
+
+      return {
+        tipo: 'pre_expediente',
+        idxSlot: idxVisivel,
+        slot: slotAlvo,
+        textoTooltip: slotAlvo ? `${rotulo} (Aulas iniciam às ${txtInicio}${infoFmt})` : '',
+        icone: idxVisivel !== -1 ? '⚡ ' : '',
+        tagLabel: ''
+      };
+    }
+
+    // 4. Após a última aula do dia na universidade (Pós-Expediente)
+    const ultimoMestre = slotsMestreHoje[slotsMestreHoje.length - 1];
+    if (agoraMin >= ultimoMestre.horaFimMin) {
+      return { tipo: 'pos_expediente', idxSlot: -1, slot: null, textoTooltip: '', icone: '', tagLabel: '' };
+    }
+
+    // 5. Em intervalo acadêmico real entre aulas da universidade
+    const proxMestre = slotsMestreHoje.find(s => s.horaInicioMin > agoraMin);
+    if (proxMestre) {
+      const diff = proxMestre.horaInicioMin - agoraMin;
+      const itemVisivel = slotsVisiveisHoje.find(item => item.slot.horaInicioMin === proxMestre.horaInicioMin);
+      const idxVisivel = itemVisivel ? itemVisivel.idx : -1;
+      const slotAlvo = itemVisivel ? itemVisivel.slot : null;
+      const rotulo = proxMestre.label || proxMestre.textoInicio;
+      const txtInicio = proxMestre.textoInicio || '';
+      const infoTempo = formatarTempoRestanteGrade(diff);
+      const infoFmt = infoTempo ? ` (${infoTempo})` : '';
+
+      return {
+        tipo: 'intervalo',
+        idxSlot: idxVisivel,
+        slot: slotAlvo,
+        textoTooltip: `${rotulo} (Intervalo em andamento — Próxima aula às ${txtInicio}${infoFmt})`,
+        icone: idxVisivel !== -1 ? '⚡ ' : '',
+        tagLabel: ''
+      };
+    }
+
+    return { tipo: 'fora_dia', idxSlot: -1, slot: null, textoTooltip: '', icone: '', tagLabel: '' };
   }
 
   function renderizarGrade() {
@@ -2126,8 +2243,8 @@
     if (containerVazio) containerVazio.style.display = 'none';
     if (containerTab) containerTab.style.display = 'block';
 
-    // 4. Determina o slot de horário atual para destaque visual na grade
-    const idxSlotAtual = obterIndiceSlotAtual(slotsAtivos);
+    // 4. Determina o estado temporal para destaque visual na grade (aula vigente ou intervalo)
+    const estadoTemporal = obterEstadoTemporalGrade(slotsAtivos, todosSlots);
 
     // 5. Renderiza o Cabeçalho (THEAD)
     let theadHtml = '<tr>';
@@ -2161,18 +2278,18 @@
       const ehUltimoDia = (dIdx === diasChaves.length - 1);
       const bordaFim = (ehUltimoSlotDoDia && !ehUltimoDia) ? ' col-dia-fim' : '';
 
-      const ehSlotAtual = (sIdx === idxSlotAtual);
+      const ehSlotDestaque = (sIdx === estadoTemporal.idxSlot);
 
       let classesSlot = `th-slot-header ${diaClass}${bordaFim}`;
-      if (ehSlotAtual) {
+      if (ehSlotDestaque) {
         classesSlot += ' col-slot-atual';
       }
 
       const rotuloSlot = s.label || s.textoInicio;
-      const iconeRaio = ehSlotAtual ? '⚡ ' : '';
-      const titleAttr = ehSlotAtual ? `${rotuloSlot} (Horário Atual em Andamento)` : rotuloSlot;
+      const iconeSlot = ehSlotDestaque ? '⚡ ' : '';
+      const titleAttr = ehSlotDestaque ? (estadoTemporal.textoTooltip || `${rotuloSlot} (Horário Atual / Próximo Horário)`) : rotuloSlot;
 
-      theadHtml += `<th class="${classesSlot}" title="${titleAttr}">${iconeRaio}${rotuloSlot}</th>`;
+      theadHtml += `<th class="${classesSlot}" title="${titleAttr}">${iconeSlot}${rotuloSlot}</th>`;
     });
     theadHtml += '</tr>';
 

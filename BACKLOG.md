@@ -3,6 +3,8 @@
 ---
 
 
+Colocar fotos de docentes no cartão flutuante
+
 # 📋 Backlog & Banco de Ideias — Alocação Plus
 
 > **Espaço ágil para captura e evolução de ideias, melhorias e tarefas pendentes.**  
@@ -69,6 +71,12 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.8.0:** Destaque do Próximo Bloco de Horário Durante Intervalos e Pré-Expediente na Grade:
+  - **Destaque Dinâmico com Identidade Visual Padronizada:** Durante os intervalos entre aulas (recessos matutino e vespertino de 10-20 min, almoço e jantar) e pré-expediente matutino, o próximo bloco letivo a iniciar recebe o destaque visual padrão existente da aplicação (fundo amarelo suave e ícone de raio `⚡ ` na classe `.col-slot-atual`), dispensando a introdução de novos estilos ou tags no DOM e preservando a elegância e simplicidade da interface;
+  - **Prevenção de Falsos Intervalos:** Resolução temporal avaliada contra a grade mestra da universidade (`todosSlots`), garantindo que filtros de busca textual ou horários ocultando a aula corrente nunca marquem horários posteriores como intervalos indevidos;
+  - **Formatação Amigável de Tempo:** Implementação de `formatarTempoRestanteGrade(diff)` para converter minutos em horas/minutos amigáveis (`em 15 min`, `em 1h 20min`, `em 2h`) no tooltip contextual (`title`);
+  - **Qualidade & Testes Automatizados:** Criação da suíte `tests/test_intervalo_slot_logic.py` com testes unitários e property-based fuzzing em todos os 1.440 minutos do dia, elevando a suíte para 122 testes (100% de sucesso);
+  - **Governança:** Registrado no ADR 0023.
 - [x] **v1.7.1:** Inserção Contextual de Nome vs. Sigla nos Chips de Disciplinas do Autocomplete:
   - **Inserção Contextual no Campo de Busca:** Ao clicar ou teclar `Enter` em um chip de disciplina sugerido a partir de busca textual por nome (ex: *"Cálculo"*, *"Resistência"*, *"Física"*), o campo de pesquisa é preenchido com o nome oficial da disciplina (ex: *"Cálculo I"*, *"Resistência dos Materiais I"*) em vez de substituir abruptamente pela sigla;
   - **Preservação da Busca por Sigla/Código:** Buscas iniciadas por prefixos de departamentos (`"SMA"`, `"SET"`, `"SEM"`), códigos alfanuméricos completos (`"SMA0301"`, `"SET0188"`), substrings numéricas (`"0301"`) ou códigos numéricos do IFSC (`"760"`, `"7600005"`) mantêm o preenchimento exato da sigla;

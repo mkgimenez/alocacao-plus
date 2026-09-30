@@ -1,0 +1,30 @@
+Analise o plano abaixo. Procure por erros e incongruências. Pense fora da caixinha. Analise casos típicos e casos de borda. ao final, gere uma versão atualizada do plano, corrigindo tudo que encontrar errado.
+
+Esse plano melhorado deve ser dividido em passos pequenos, verificáveis e testáveis por meio de testes automatizados, e cada passo deve ser construído de forma incremental sobre o passo anterior validado e testado.
+
+Certifique-se de incluir testes unitários automatizados para cada peça de código nova implementada.
+
+___
+
+
+
+
+Não implemente, apenas me diga se entendeu.
+
+Ficou ótimo!
+Atualize a documentação. Implemente, Execute build, push e git add . apenas. Sem deploy e sem commit.
+
+
+Ficou ótimo!
+Atualize a documentação. Execute bump patch, gas push e gas deploy. Execute git add . e git commit.
+
+Ficou ótimo!
+Atualize a documentação. Execute bump minor, gas push e gas deploy. Execute git add . e git commit.
+
+
+
+___
+
+
+Correção necessária:
+- Quando fazemos uma busca textual na caixa de busca pelo nome de uma disciplina, a caixa lista alguns chips de disciplinas. Até aí tudo correto. O problema é que quando clicamos no chip, o que é jogado na caixa de busca é a sigla da disciplina, em vez do nome. O comportamento desejado é o seguinte: ao se clicar em um chip de disciplina encontrada pelo nome, o nome da disciplina vai para a caixa de busca; já no caso de se clicar em um chip de disciplina buscado por sigla, é a sigla da disciplina que deve ir para o campo de busca.

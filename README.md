@@ -26,6 +26,7 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
   - **🚪 Modo Salas Livres:** Identifica instantaneamente quais salas estão desocupadas no intervalo selecionado.
 - **🔍 Busca Inteligente & Autocomplete Fiel à Grade:** Pesquisa multicritério por código de disciplina, nome de docente, modalidade, local de aula ou termos livres, com popover de autocomplete cujos chips (departamentos, disciplinas e docentes) são derivados **100% da grade alocada no momento** (eliminando chips fantasmas e resultados vazios), departamentos ativos ordenados por volume real de aulas no semestre, feedback contextual durante o enriquecimento assíncrono e **inserção contextual inteligente** nos chips de disciplinas (inserindo o nome oficial da matéria ao buscar por nome ou a sigla ao buscar por código).
 - **🎨 Coloração Progressiva da Grade:** Células iniciam com estilo neutro e suave (`.celula-aula-pendente`), transitando para as cores oficiais (azul céu para graduação e azul cobalto para pós-graduação) conforme os lotes são carregados ao vivo em segundo plano.
+- **⚡ Destaque Inteligente de Horários e Intervalos:** Orientação temporal contínua na grade: tanto durante aulas vigentes quanto nos intervalos entre aulas e almoço, destaca o bloco de horário correspondente ou o próximo período letivo a iniciar com as cores e ícone padrão da aplicação (amarelo suave e `⚡ ` na classe `.col-slot-atual`), com resolução temporal contra a grade mestra protegida contra filtros e tooltip contextual com contagem regressiva (`em 15 min`, `em 1h 20min`).
 - **📊 Grade com Cabeçalhos Sticky & Viewport Maximizado:** Rolagem bidirecional fluida com camadas rigorosas de cabeçalho (`z-index` estratificado), onde colunas de dias e horários deslizam sob as colunas fixas de salas e capacidade, com viewport vertical maximizado para exibição contínua da matriz de ocupação.
 - **📐 Fila Inteligente com Viewport 2D:** O worker em segundo plano prioriza estritamente as células visíveis na tela (interseção 2D de salas e horários visíveis) em ordem natural de leitura, com reordenação dinâmica na rolagem da grade (debounce de 150ms) e promoção imediata (Prioridade 0) com card *skeleton* no clique.
 - **🔗 Integração e Enriquecimento com Portais Acadêmicos da USP:**
@@ -66,8 +67,9 @@ alocacao-plus/
 │       ├── README.md              # Índice cronológico e template de decisões
 │       └── 0001-*.md              # Registros de decisões técnicas individuais
 │
-├── tests/                         # Suíte de testes automatizados e fixtures
+├── tests/                         # Suíte de testes automatizados e fixtures (122 testes)
 │   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
+│   ├── test_intervalo_slot_logic.py # Resolução temporal, intervalos, contagem regressiva e fuzzing
 │   ├── test_cell_coloring_logic.py # Validação de coloração progressiva e classes CSS
 │   ├── test_queue_logic.py        # Fila 2D de viewport, reordenação em scroll e concorrência
 │   ├── test_autocomplete_logic.py # Autocomplete exclusivo da grade e busca semântica (83 testes)
