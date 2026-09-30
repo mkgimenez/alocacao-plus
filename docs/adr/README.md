@@ -32,6 +32,7 @@ Um **Architecture Decision Record (ADR)** é um documento curto em formato Markd
 | [0022](0022-insercao-contextual-chips-disciplina-nome-sigla.md) | Inserção Contextual de Nome vs. Sigla nos Chips de Disciplinas do Autocomplete | **Aceito** | 2026-09-28 |
 | [0023](0023-destaque-visual-intervalos-entre-aulas.md) | Destaque Visual de Horário Durante Intervalos e Pré-Expediente na Grade | **Aceito** | 2026-09-30 |
 | [0024](0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md) | Padronização de Posicionamento e Estilos de Botões em Modais e Barras de Ação | **Aceito** | 2026-09-30 |
+| [0025](0025-modo-desenvolvedor-e-supressao-de-telemetria.md) | Modo Desenvolvedor e Autoexclusão de Telemetria via Parâmetro de URL (?dev=1) | **Aceito** | 2026-09-30 |
 
 ---
 

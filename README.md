@@ -35,6 +35,7 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
     - **No Clique:** Abre instantaneamente o **Card Modal Elegante** com estado de carregamento (*skeleton shimmer*), seleção de turmas por pills, horários oficiais, contagem de alunos matriculados (Graduação) ou vagas oferecidas (Pós-Graduação), docentes e observações.
     - **Acesso Externo:** Botões dedicados no rodapé do modal ("*Abrir no Jupiterweb ↗*" / "*Abrir no Janus ↗*") para consulta direta aos portais oficiais em nova aba.
 - **🖨️ Preparação e Impressão Inteligente da Grade (Papel e PDF):** Rotina avançada para impressão e exportação em formato paisagem com suporte a atalhos (`Ctrl + P` / `Cmd + P`), cabeçalho institucional oficial com resumo de filtros e carimbo temporal (Brasília), neutralização de destaques de interação e tempo real, e escolha entre **Modo Escala de Cinza** (alta economia de tinta/toner, fundo branco e distinção Graduação vs Pós via borda dupla e marcador tipográfico `[PÓS]`) e **Modo Colorido** (`print-color-adjust: exact`). Possui opção de **Densidade Compacta** (maximizando salas e horários em folha A4) e ocultação opcional da coluna de capacidade.
+- **📈 Telemetria Nativa & Modo Desenvolvedor (?dev=1):** Registro silencioso e assíncrono de estatísticas de acesso e audiência direto no Google Sheets (aba oculta `_Metricas`), com suporte a **Modo Desenvolvedor / Autoexclusão** persistente (`?dev=1` para ativar / `?dev=0` para reativar) e badge `DEV` no cabeçalho, garantindo que testes e manutenções do administrador não contaminem as métricas de uso.
 - **⚙️ Parametrização sem Código:** A equipe acadêmica pode alternar IDs de planilhas e tempos de cache via aba `_Config` sem tocar no código-fonte.
 
 ---
@@ -69,8 +70,9 @@ alocacao-plus/
 │       ├── README.md              # Índice cronológico e template de decisões
 │       └── 0001-*.md              # Registros de decisões técnicas individuais
 │
-├── tests/                         # Suíte de testes automatizados e fixtures (144 testes)
+├── tests/                         # Suíte de testes automatizados e fixtures (152 testes)
 │   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
+│   ├── test_dev_mode_telemetria.py # Validação do modo dev (?dev=1) e supressão de telemetria
 │   ├── test_print_logic.py        # Validação da impressão inteligente, resumo e CSS
 │   ├── test_intervalo_slot_logic.py # Resolução temporal, intervalos, contagem regressiva e fuzzing
 │   ├── test_cell_coloring_logic.py # Validação de coloração progressiva e classes CSS

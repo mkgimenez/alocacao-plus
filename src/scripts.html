@@ -47,6 +47,7 @@
   // Inicialização ao carregar a página
   // --------------------------------------------------------------------------
   window.addEventListener('DOMContentLoaded', function() {
+    configurarModoDesenvolvedor();
     configurarIndicadorHoje();
     iniciarMonitoramentoHorarioAtual();
     iniciarMonitoramentoScrollGrade();
@@ -100,8 +101,117 @@
   }
 
   // --------------------------------------------------------------------------
-  // Telemetria e Estatísticas de Acesso (Nativo, Silencioso e Anônimo)
+  // Modo Desenvolvedor & Telemetria / Estatísticas de Acesso
   // --------------------------------------------------------------------------
+  const CHAVE_IGNORAR_METRICAS = 'alocacao_plus_ignorar_telemetria';
+
+  function atualizarBadgeDevMode(ativo) {
+    const badge = document.getElementById('badge-dev-mode');
+    if (badge) {
+      badge.style.display = ativo ? 'inline-block' : 'none';
+    }
+  }
+
+  function configurarModoDesenvolvedor() {
+    let paramDev = null;
+
+    // 1. Tenta obter o parâmetro 'dev' injetado pelo doGet via template
+    if (typeof window.__APP_DEV_PARAM !== 'undefined' && window.__APP_DEV_PARAM !== null) {
+      paramDev = String(window.__APP_DEV_PARAM).trim();
+    }
+
+    // 2. Tenta obter diretamente da URL da janela atual (útil para testes locais e navegação direta)
+    if (!paramDev) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('dev')) {
+          paramDev = String(urlParams.get('dev')).trim();
+        }
+      } catch (e) {}
+    }
+
+    // 3. Processa a ativação ou desativação explícita via URL
+    if (paramDev !== null) {
+      const devLower = paramDev.toLowerCase();
+      if (devLower === '1' || devLower === 'true') {
+        const jaEstavaAtivo = localStorage.getItem(CHAVE_IGNORAR_METRICAS) === 'true';
+        try {
+          localStorage.setItem(CHAVE_IGNORAR_METRICAS, 'true');
+        } catch (e) {}
+        atualizarBadgeDevMode(true);
+        console.info('🛠️ [Modo Desenvolvedor] Ativado. Telemetria e métricas de acesso desativadas para este navegador.');
+        if (!jaEstavaAtivo && typeof exibirToast === 'function') {
+          setTimeout(() => {
+            exibirToast(
+              'Modo Desenvolvedor Ativado 🛠️',
+              'Telemetria e estatísticas de acesso foram desativadas neste dispositivo.',
+              'info',
+              6000
+            );
+          }, 600);
+        }
+      } else if (devLower === '0' || devLower === 'false') {
+        const estavaAtivo = localStorage.getItem(CHAVE_IGNORAR_METRICAS) === 'true';
+        try {
+          localStorage.removeItem(CHAVE_IGNORAR_METRICAS);
+        } catch (e) {}
+        atualizarBadgeDevMode(false);
+        console.info('📊 [Modo Desenvolvedor] Desativado. Telemetria reativada.');
+        if (estavaAtivo && typeof exibirToast === 'function') {
+          setTimeout(() => {
+            exibirToast(
+              'Modo Desenvolvedor Desativado 📊',
+              'Telemetria de estatísticas reativada para este dispositivo.',
+              'sucesso',
+              5000
+            );
+          }, 600);
+        }
+      }
+    } else {
+      // 4. Se não houve parâmetro na URL atual, respeita a preferência previamente gravada no localStorage
+      try {
+        const ativo = localStorage.getItem(CHAVE_IGNORAR_METRICAS) === 'true';
+        atualizarBadgeDevMode(ativo);
+        if (ativo) {
+          console.info('🛠️ [Alocação Plus] Modo desenvolvedor ativo: telemetria desativada via preferência salva neste dispositivo.');
+        }
+      } catch (e) {}
+    }
+
+    // 5. Integração com a API oficial do Google Apps Script para leitura assíncrona da URL pai (quando executado em iframe)
+    if (typeof google !== 'undefined' && google.script && google.script.url && typeof google.script.url.getLocation === 'function') {
+      try {
+        google.script.url.getLocation(function(loc) {
+          if (loc && loc.parameter && typeof loc.parameter.dev !== 'undefined') {
+            const devUrl = String(loc.parameter.dev).trim().toLowerCase();
+            if (devUrl === '1' || devUrl === 'true') {
+              if (localStorage.getItem(CHAVE_IGNORAR_METRICAS) !== 'true') {
+                try {
+                  localStorage.setItem(CHAVE_IGNORAR_METRICAS, 'true');
+                } catch (e) {}
+                atualizarBadgeDevMode(true);
+                if (typeof exibirToast === 'function') {
+                  exibirToast('Modo Desenvolvedor Ativado 🛠️', 'Telemetria desativada neste dispositivo.', 'info', 6000);
+                }
+              }
+            } else if (devUrl === '0' || devUrl === 'false') {
+              if (localStorage.getItem(CHAVE_IGNORAR_METRICAS) === 'true') {
+                try {
+                  localStorage.removeItem(CHAVE_IGNORAR_METRICAS);
+                } catch (e) {}
+                atualizarBadgeDevMode(false);
+                if (typeof exibirToast === 'function') {
+                  exibirToast('Modo Desenvolvedor Desativado 📊', 'Telemetria reativada para este dispositivo.', 'sucesso', 5000);
+                }
+              }
+            }
+          }
+        });
+      } catch (e) {}
+    }
+  }
+
   function obterIdAnonimoUsuario() {
     const CHAVE_ID = 'alocacao_plus_uid';
     let uid = null;
@@ -145,12 +255,19 @@
 
   function registrarAcessoSilencioso() {
     try {
-      // Executa apenas quando implantado no Google Apps Script
+      // 1. Se o modo desenvolvedor/exclusão estiver ativo, não envia absolutamente nada
+      try {
+        if (localStorage.getItem(CHAVE_IGNORAR_METRICAS) === 'true') {
+          return;
+        }
+      } catch (e) {}
+
+      // 2. Executa apenas quando implantado no Google Apps Script
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
         return;
       }
 
-      // Evita duplicação por reloads rápidos (limite de 1 ping a cada 15 min por sessão/aba)
+      // 3. Evita duplicação por reloads rápidos (limite de 1 ping a cada 15 min por sessão/aba)
       const CHAVE_SESSAO = 'alocacao_plus_ping_sessao';
       const agoraMs = Date.now();
       const ultimoPing = sessionStorage.getItem(CHAVE_SESSAO);

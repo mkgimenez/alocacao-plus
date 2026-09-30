@@ -14,8 +14,9 @@ const CONFIG = {
  * Renderiza o template 'Index.html' modularizado com CSS e JS
  */
 function doGet(e) {
-  return HtmlService.createTemplateFromFile('index')
-    .evaluate()
+  const template = HtmlService.createTemplateFromFile('index');
+  template.paramDev = (e && e.parameter && typeof e.parameter.dev !== 'undefined') ? String(e.parameter.dev) : null;
+  return template.evaluate()
     .setTitle('Alocação Plus - EESC-USP')
     .setFaviconUrl('https://eesc.usp.br/imgs/favicon/favicon.png')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
@@ -1720,6 +1721,11 @@ function inicializarAbaMetricas(ss) {
  * Protegido por LockService para evitar concorrência de escritas simultâneas na planilha.
  */
 function registrarAcessoWeb(payload) {
+  // Proteção backend: ignora silenciosamente se marcado como desenvolvedor ou ignorar
+  if (payload && (payload.isDev || payload.ignorar)) {
+    return { sucesso: true, ignorado: true, motivo: 'modo_dev' };
+  }
+
   const lock = LockService.getScriptLock();
   const temLock = lock.tryLock(2500);
   if (!temLock) {

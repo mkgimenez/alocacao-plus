@@ -78,6 +78,13 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.10.0:** Modo Desenvolvedor e Autoexclusão de Telemetria via Parâmetro de URL (?dev=1) (ADR 0025):
+  - **Autoexclusão Persistente no Navegador:** Ativação descomplicada via parâmetro de URL (`?dev=1` ou `?dev=true`) salvando a preferência em `localStorage` (`alocacao_plus_ignorar_telemetria = true`), permitindo que manutenções e testes diários do administrador não poluam as estatísticas de uso em `_Metricas`;
+  - **Cancelamento Imediato no Cliente (Zero Overhead):** A rotina `registrarAcessoSilencioso()` aborta de imediato no navegador antes de checar conexões ou timers, poupando 100% de cotas de execução do Apps Script e eliminando escritas concorrentes na planilha;
+  - **Identificação Visual Transparente (`DEV`):** Inclusão de badge semântico `#badge-dev-mode` (`DEV`) estilizado no Design System EESC ao lado do número de versão no cabeçalho e notificação Toast confirmatória na ativação e desativação;
+  - **Reversibilidade Simples:** Permite restaurar o envio normal de telemetria a qualquer momento via `?dev=0` (ou `?dev=false`);
+  - **Defesa em Profundidade no Backend:** O endpoint `registrarAcessoWeb(payload)` em `alocacao-plus.gs` rejeita payloads marcados com flags de teste (`isDev` ou `ignorar`);
+  - **ADR 0025 e Testes Automatizados:** Decisão documentada no [ADR 0025](docs/adr/0025-modo-desenvolvedor-e-supressao-de-telemetria.md) e suíte unitária `tests/test_dev_mode_telemetria.py` elevando os testes automatizados para 152 testes (100% de sucesso).
 - [x] **v1.9.1:** Padronização de Posicionamento e Estilos de Botões em Modais e Ações (ADR 0024):
   - **Formatação Homogênea na Barra de Ações:** O botão `🖨️ Imprimir Grade` adota a mesma identidade visual táctil de `🧹 Limpar Filtros` (`.btn-reset`);
   - **Identidade Visual de Ação em Modais:** O botão `🖨️ Imprimir / Salvar PDF` do modal adota a formatação estilizada de ação institucional (`.btn-link-externo-jupiter` / `.btn-imprimir-confirmar`);

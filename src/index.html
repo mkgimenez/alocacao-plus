@@ -5,6 +5,10 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alocação Plus - EESC-USP</title>
+  <!-- Injeção segura de parâmetros de inicialização do servidor -->
+  <script>
+    window.__APP_DEV_PARAM = <?!= JSON.stringify(typeof paramDev !== 'undefined' ? paramDev : null) ?>;
+  </script>
   <!-- Inclusão dos Estilos CSS Modulares -->
   <?!= include('estilos'); ?>
 </head>
@@ -15,7 +19,7 @@
       <div class="header-brand">
         <div class="brand-icon">💡</div>
         <div>
-          <h1 class="brand-title">Alocação Plus <span class="badge-versao"><?= APP_FULL_VERSION ?></span></h1>
+          <h1 class="brand-title">Alocação Plus <span class="badge-versao"><?= APP_FULL_VERSION ?></span><span id="badge-dev-mode" class="badge-dev-mode" style="display: none;" title="Modo Desenvolvedor Ativo: telemetria e estatísticas desativadas neste navegador">DEV</span></h1>
           <p class="brand-subtitle">EESC-USP | Consulta Inteligente de Grade e Ocupação</p>
         </div>
       </div>
