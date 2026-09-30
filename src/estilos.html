@@ -2355,7 +2355,8 @@
   }
 
   .btn-link-externo-jupiter,
-  .btn-cancelar-modal {
+  .btn-cancelar-modal,
+  .btn-fechar-modal {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2383,7 +2384,8 @@
   }
 
   .btn-link-externo-jupiter:hover,
-  .btn-cancelar-modal:hover {
+  .btn-cancelar-modal:hover,
+  .btn-fechar-modal:hover {
     background: var(--primary-light);
     border-color: var(--primary);
     color: var(--primary-hover);
@@ -2392,14 +2394,16 @@
   }
 
   .btn-link-externo-jupiter:active,
-  .btn-cancelar-modal:active {
+  .btn-cancelar-modal:active,
+  .btn-fechar-modal:active {
     transform: scale(0.96);
     box-shadow: 0 1px 2px rgba(16, 72, 128, 0.12);
     transition-duration: 0.05s;
   }
 
   .btn-link-externo-jupiter:focus-visible,
-  .btn-cancelar-modal:focus-visible {
+  .btn-cancelar-modal:focus-visible,
+  .btn-fechar-modal:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(16, 72, 128, 0.25);
   }
@@ -2497,7 +2501,6 @@
     box-shadow: 0 0 0 2px rgba(16, 72, 128, 0.25);
   }
 
-  .btn-fechar-modal,
   .btn-imprimir-confirmar {
     display: inline-flex;
     align-items: center;
@@ -2524,7 +2527,6 @@
                 transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .btn-fechar-modal:hover,
   .btn-imprimir-confirmar:hover {
     background: var(--primary-hover);
     border-color: var(--primary-hover);
@@ -2533,14 +2535,12 @@
     box-shadow: 0 3px 6px rgba(16, 72, 128, 0.25);
   }
 
-  .btn-fechar-modal:active,
   .btn-imprimir-confirmar:active {
     transform: scale(0.96);
     box-shadow: 0 1px 2px rgba(16, 72, 128, 0.2);
     transition-duration: 0.05s;
   }
 
-  .btn-fechar-modal:focus-visible,
   .btn-imprimir-confirmar:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(16, 72, 128, 0.35);

@@ -39,8 +39,8 @@ touch-action: manipulation;
 
 ## 🏷️ Tipos de Botão no Sistema
 
-### 1. Botão Primário Sólido (`.btn-fechar-modal`, `.btn-imprimir-confirmar`)
-Utilizado para ações principais afirmativas/confirmação (`Imprimir / Salvar PDF`, `Salvar`) ou fechamento de modais informativos.
+### 1. Botão Primário Sólido (`.btn-imprimir-confirmar`)
+Utilizado exclusivamente para ações afirmativas de submissão e confirmação (`Imprimir / Salvar PDF`, `Salvar`) que avançam o fluxo de trabalho.
 
 * **Fundo:** `var(--primary)` (#104880)
 * **Texto:** `#ffffff`
@@ -51,8 +51,8 @@ Utilizado para ações principais afirmativas/confirmação (`Imprimir / Salvar 
 
 ---
 
-### 2. Botão Secundário / Outline (`.btn-filtrar-disciplina`, `.btn-link-externo-jupiter`, `.btn-primary-outline`, `.btn-cancelar-modal`)
-Utilizado para links externos, filtros ou ações de cancelamento/desistência em modais de confirmação.
+### 2. Botão Secundário / Outline (`.btn-filtrar-disciplina`, `.btn-link-externo-jupiter`, `.btn-primary-outline`, `.btn-cancelar-modal`, `.btn-fechar-modal`)
+Utilizado para links externos, filtros contextuais, cancelamento em diálogos de confirmação e fechamento de modais informativos.
 
 * **Fundo:** `#ffffff`
 * **Texto:** `var(--primary)` (#104880)
@@ -117,7 +117,7 @@ Esta diretriz rege o posicionamento de ações em todo o ecossistema do **Aloca�
 
 2. **Modais Informativos (ex: Card Flutuante de Disciplinas):**
    * **Lado Esquerdo / Centro — Ações Contextuais:** Links externos e ferramentas de navegação (`Abrir no Jupiterweb ↗`, `Trocar de Sala ⇄`, `Filtrar disciplina`).
-   * **Lado Direito — Ação de Fechamento:** Botão `Fechar` (`.btn-fechar-modal`) como única saída de leitura.
+   * **Lado Direito — Ação de Fechamento:** Botão `Fechar` (`.btn-fechar-modal`) em estilo secundário outline, integrando-se harmonicamente sem competir ou ofuscar as ações operacionais do card.
 
 3. **Barra Superior de Ações Rápidas da Grade:**
    * Botões operacionais complementares (`🖨️ Imprimir Grade`) compartilham a mesma formatação visual e tátil do botão `🧹 Limpar Filtros` (`.btn-reset`, `.btn-imprimir-grade`), mantendo harmonia cromática neutra.

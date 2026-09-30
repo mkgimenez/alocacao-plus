@@ -3539,7 +3539,7 @@
         const modalPrint = document.getElementById('modal-impressao-grade');
         if (modalPrint && modalPrint.classList.contains('aberto')) {
           const elFocado = document.activeElement;
-          const ehBotaoFechar = elFocado && (elFocado.classList.contains('modal-btn-fechar') || elFocado.classList.contains('btn-fechar-modal'));
+          const ehBotaoFechar = elFocado && (elFocado.classList.contains('modal-btn-fechar') || elFocado.classList.contains('btn-fechar-modal') || elFocado.classList.contains('btn-cancelar-modal'));
           if (!ehBotaoFechar) {
             e.preventDefault();
             executarImpressaoGrade();

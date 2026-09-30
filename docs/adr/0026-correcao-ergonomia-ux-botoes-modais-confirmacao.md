@@ -27,11 +27,11 @@ Revisar e corrigir a convenção arquitetural de botões e diálogos do sistema 
 
 * **Modais Puramente Informativos (ex.: Card de Informações da Disciplina):**
   - **Lado Esquerdo:** Ações e links contextuais de navegação externa ou filtros (`Abrir no Jupiterweb ↗`, `Trocar de Sala ⇄`, `Filtrar disciplina`).
-  - **Lado Direito:** Botão de fechamento (`Fechar`), atuando como saída única de leitura (`.btn-fechar-modal`).
+  - **Lado Direito:** Botão de fechamento (`Fechar`), atuando como saída de leitura em estilo secundário outline (`.btn-fechar-modal`, fundo branco `#ffffff`, texto `var(--primary)` e borda suave), evitando destaque desproporcional para uma ação de encerramento e mantendo as ações operacionais do card valorizadas.
 
 ### 2. Hierarquia Visual Consistente
-* Botões afirmativos e principais do fluxo carregam sempre a maior proeminência visual (sólido, preenchido com a cor de destaque da marca/instituição).
-* Botões de cancelamento ou secundários operam com baixa ou média saliência visual (outline ou neutro claro), prevenindo acionamentos equivocados.
+* Botões afirmativos de submissão/confirmação (`.btn-imprimir-confirmar`) carregam a maior proeminência visual (sólido institucional com preenchimento `var(--primary)` e texto branco).
+* Botões de cancelamento ou fechamento (`.btn-cancelar-modal`, `.btn-fechar-modal`) e ações auxiliares operam com estilo secundário outline, preservando clareza sem poluição cognitiva.
 
 ### 3. Preservação de Micro-Interações e Acessibilidade
 * Todas as classes de botão (`.btn-cancelar-modal`, `.btn-imprimir-confirmar`, `.btn-fechar-modal`) mantêm as micro-interações táteis ("efeitos fofinhos") padronizadas: transição spring, elevação no hover (`translateY(-1px)`), compressão no clique (`scale(0.96)`) e suporte estrito a `@media (prefers-reduced-motion: reduce)`.
