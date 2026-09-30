@@ -353,16 +353,18 @@ class TestPrintStep5And6Lifecycle(unittest.TestCase):
         self.assertIn('id="btn-confirmar-impressao"', self.html_index)
         self.assertIn('id="btn-abrir-impressao"', self.html_index)
 
-    def test_conformidade_botoes_adr_0024(self):
-        """Valida que o botão de abrir e os botões do modal respeitam a formatação e ordenação espacial do ADR 0024."""
+    def test_conformidade_botoes_adr_0026(self):
+        """Valida que o botão de abrir e os botões do modal respeitam a ergonomia UX e ordenação espacial do ADR 0026."""
         # 1. Botão da barra de ações deve ter a formatação idêntica ao botão de resetar filtros
         self.assertIn('id="btn-abrir-impressao" class="btn-reset btn-imprimir-grade"', self.html_index)
 
-        # 2. Botão de confirmar impressão deve ter a formatação do botão externo (btn-link-externo-jupiter)
-        self.assertIn('id="btn-confirmar-impressao" class="btn-link-externo-jupiter btn-imprimir-confirmar"', self.html_index)
+        # 2. Botão de confirmar impressão deve ter estilo primário sólido (.btn-imprimir-confirmar)
+        self.assertIn('id="btn-confirmar-impressao" class="btn-imprimir-confirmar"', self.html_index)
 
-        # 3. No rodapé do modal, o botão de ação (Imprimir) deve anteceder o botão de cancelamento (Cancelar)
-        # O rodapé usa space-between, portanto o primeiro fica à esquerda e o segundo à direita
+        # 3. Botão de cancelamento deve ter classe secundária outline (.btn-cancelar-modal)
+        self.assertIn('class="btn-cancelar-modal"', self.html_index)
+
+        # 4. No rodapé do modal de confirmação, Cancelar (esquerda) deve anteceder Confirmar (direita)
         rodape_idx = self.html_index.find('id="modal-impressao-grade"')
         self.assertTrue(rodape_idx != -1)
         sub_html = self.html_index[rodape_idx:]
@@ -372,7 +374,7 @@ class TestPrintStep5And6Lifecycle(unittest.TestCase):
         pos_confirmar = footer_html.find('btn-confirmar-impressao')
         pos_cancelar = footer_html.find('fecharModalImpressao()')
         self.assertTrue(pos_confirmar != -1 and pos_cancelar != -1)
-        self.assertLess(pos_confirmar, pos_cancelar, "No rodapé do modal, o botão de confirmação (esquerda) deve anteceder o botão de cancelamento (direita).")
+        self.assertLess(pos_cancelar, pos_confirmar, "No rodapé do modal, o botão de cancelamento (esquerda) deve anteceder o botão de confirmação (direita).")
 
 
 

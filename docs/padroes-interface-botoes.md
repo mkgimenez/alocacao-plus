@@ -39,8 +39,8 @@ touch-action: manipulation;
 
 ## 🏷️ Tipos de Botão no Sistema
 
-### 1. Botão Primário Sólido (`.btn-fechar-modal`)
-Utilizado para ações definitivas ou de fechamento principal.
+### 1. Botão Primário Sólido (`.btn-fechar-modal`, `.btn-imprimir-confirmar`)
+Utilizado para ações principais afirmativas/confirmação (`Imprimir / Salvar PDF`, `Salvar`) ou fechamento de modais informativos.
 
 * **Fundo:** `var(--primary)` (#104880)
 * **Texto:** `#ffffff`
@@ -51,8 +51,8 @@ Utilizado para ações definitivas ou de fechamento principal.
 
 ---
 
-### 2. Botão Secundário / Outline (`.btn-filtrar-disciplina`, `.btn-link-externo-jupiter`, `.btn-primary-outline`)
-Utilizado para links externos, filtros ou ações contextuais no card.
+### 2. Botão Secundário / Outline (`.btn-filtrar-disciplina`, `.btn-link-externo-jupiter`, `.btn-primary-outline`, `.btn-cancelar-modal`)
+Utilizado para links externos, filtros ou ações de cancelamento/desistência em modais de confirmação.
 
 * **Fundo:** `#ffffff`
 * **Texto:** `var(--primary)` (#104880)
@@ -102,16 +102,23 @@ Para que botões na mesma linha nunca fiquem desalinhados:
 
 ---
 
-## 🧭 Regra Universal de Posicionamento Espacial (Esquerda vs. Direita)
+## 🧭 Regra Universal de Posicionamento Espacial e UX (ADRs 0024 e 0026)
 
-Formalizada no **ADR 0024**, esta diretriz rege o posicionamento de ações em todo o ecossistema do **Alocação Plus**:
+Esta diretriz rege o posicionamento de ações em todo o ecossistema do **Alocação Plus**, em estrita consonância com os padrões da indústria (Nielsen Norman Group, Material Design, Apple HIG):
 
-1. **Lado Direito — Ações de Saída, Fechamento e Cancelamento:**
-   * Botões como `Fechar`, `Cancelar` e similares devem **sempre ficar no lado direito** do rodapé de modais e caixas de diálogo.
-   * Empregam a variante sólida institucional `.btn-fechar-modal`.
-2. **Lado Esquerdo ou Centralizado — Ações Positivas, Operações e Confirmações:**
-   * Botões como `OK`, `Confirmar`, `🖨️ Imprimir / Salvar PDF`, `Abrir no Jupiterweb ↗`, `Trocar de Sala ⇄` e `Filtrar disciplina` devem **ficar posicionados no lado esquerdo ou centralizados**, conforme o fluxo de leitura do leiaute.
-   * Empregam a variante outline secundária padronizada (`.btn-link-externo-jupiter`, `.btn-imprimir-confirmar`).
+1. **Modais de Ação / Confirmação (ex: Preparação de Impressão da Grade):**
+   * **Lado Esquerdo — Ação Secundária / Cancelamento:**
+     - O botão `Cancelar` (ou `Voltar`) posiciona-se no **lado esquerdo** do rodapé.
+     - Emprega a variante secundária outline `.btn-cancelar-modal` (fundo branco, texto institucional e borda sutil).
+   * **Lado Direito (Terminal Area) — Ação Afirmativa / Confirmação:**
+     - O botão `🖨️ Imprimir / Salvar PDF` (ou `Confirmar`, `Salvar`) posiciona-se no **extremo direito**.
+     - Emprega a variante sólida institucional primária `.btn-imprimir-confirmar` (fundo `var(--primary)`, texto branco e destaque de elevação).
+     - **Fundamentação UX:** O fluxo de leitura ocidental (LTR / Z-pattern / Diagrama de Gutenberg) converge naturalmente no canto inferior direito para a conclusão afirmativa do diálogo.
+
+2. **Modais Informativos (ex: Card Flutuante de Disciplinas):**
+   * **Lado Esquerdo / Centro — Ações Contextuais:** Links externos e ferramentas de navegação (`Abrir no Jupiterweb ↗`, `Trocar de Sala ⇄`, `Filtrar disciplina`).
+   * **Lado Direito — Ação de Fechamento:** Botão `Fechar` (`.btn-fechar-modal`) como única saída de leitura.
+
 3. **Barra Superior de Ações Rápidas da Grade:**
    * Botões operacionais complementares (`🖨️ Imprimir Grade`) compartilham a mesma formatação visual e tátil do botão `🧹 Limpar Filtros` (`.btn-reset`, `.btn-imprimir-grade`), mantendo harmonia cromática neutra.
 

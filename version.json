@@ -1,9 +1,9 @@
 {
   "major": 1,
   "minor": 10,
-  "patch": 0,
+  "patch": 1,
   "build": 0,
-  "version": "v1.10.0",
-  "full_version": "v1.10.0 (build 0)",
-  "last_updated": "2026-09-30 13:27:32"
+  "version": "v1.10.1",
+  "full_version": "v1.10.1 (build 0)",
+  "last_updated": "2026-09-30 13:39:14"
 }

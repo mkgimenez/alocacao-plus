@@ -102,15 +102,15 @@ O módulo é 100% testado pela suíte automatizada `tests/test_print_logic.py`, 
 - Property-based fuzzing com 300 variações aleatórias de filtros garantindo 0 exceções.
 - Testes sintáticos das regras fundamentais de `@media print`, resets de SPA e classes de controle.
 - Simulação do ciclo de vida, restauração de classes do `body` e atalhos de teclado.
-- Conformidade estrutural e de posicionamento espacial dos botões conforme o [ADR 0024](adr/0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md).
+- Conformidade estrutural e de posicionamento espacial dos botões conforme os [ADR 0024](adr/0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md) e [ADR 0026](adr/0026-correcao-ergonomia-ux-botoes-modais-confirmacao.md).
 
 ---
 
-## 8. Padronização de Interface e Botões (ADR 0024)
+## 8. Padronização de Interface e Botões (ADR 0024 e ADR 0026)
 
-Em estrita consonância com o [ADR 0024](adr/0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md):
+Em estrita consonância com o [ADR 0024](adr/0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md) e a correção ergonômica de UX do [ADR 0026](adr/0026-correcao-ergonomia-ux-botoes-modais-confirmacao.md):
 - **Botão de Disparo**: O botão `🖨️ Imprimir Grade` na barra de ações compartilha a classe `.btn-reset` (`.btn-imprimir-grade`), mantendo harmonia com o botão de limpar filtros.
-- **Rodapé do Modal de Configuração**:
-  - `🖨️ Imprimir / Salvar PDF` posicionado no canto **esquerdo** com a classe `.btn-link-externo-jupiter` (`.btn-imprimir-confirmar`).
-  - `Cancelar` posicionado no canto **direito** com a classe `.btn-fechar-modal`.
+- **Rodapé do Modal de Configuração (Fluxo LTR / Gutenberg Diagram)**:
+  - `Cancelar` posicionado no canto **esquerdo** com a classe secundária outline `.btn-cancelar-modal`.
+  - `🖨️ Imprimir / Salvar PDF` posicionado no canto **direito** com a classe primária sólida institucional `.btn-imprimir-confirmar`.
 

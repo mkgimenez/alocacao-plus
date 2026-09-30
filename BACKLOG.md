@@ -78,6 +78,11 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.10.1:** Correção de Ergonomia e Boas Práticas de UX no Posicionamento e Estilos de Botões em Modais (ADR 0026):
+  - **Alinhamento ao Fluxo de Leitura Natural (LTR / Diagrama de Gutenberg):** Correção do posicionamento em modais de confirmação (`#modal-impressao-grade`), posicionando a ação afirmativa/submissão (`🖨️ Imprimir / Salvar PDF`) no canto inferior direito (*terminal area*) e o botão de desistência (`Cancelar`) à esquerda;
+  - **Hierarquia Visual Restaurada:** A ação primária de confirmação passa a receber estilo sólido institucional (`.btn-imprimir-confirmar`, fundo azul USP `#104880` e texto branco), enquanto o botão `Cancelar` passa a adotar estilo secundário outline (`.btn-cancelar-modal`), eliminando cliques acidentais;
+  - **Acessibilidade e Micro-Interações:** Ambas as classes contempladas nas animações táteis e registradas na media query `@media (prefers-reduced-motion: reduce)`;
+  - **Governança e Testes Automatizados:** Decisão formalizada no [ADR 0026](docs/adr/0026-correcao-ergonomia-ux-botoes-modais-confirmacao.md) (emendando o ADR 0024) e validação unitária atualizada em `tests/test_print_logic.py` mantendo 152 testes automatizados com 100% de sucesso.
 - [x] **v1.10.0:** Modo Desenvolvedor e Autoexclusão de Telemetria via Parâmetro de URL (?dev=1) (ADR 0025):
   - **Autoexclusão Persistente no Navegador:** Ativação descomplicada via parâmetro de URL (`?dev=1` ou `?dev=true`) salvando a preferência em `localStorage` (`alocacao_plus_ignorar_telemetria = true`), permitindo que manutenções e testes diários do administrador não poluam as estatísticas de uso em `_Metricas`;
   - **Cancelamento Imediato no Cliente (Zero Overhead):** A rotina `registrarAcessoSilencioso()` aborta de imediato no navegador antes de checar conexões ou timers, poupando 100% de cotas de execução do Apps Script e eliminando escritas concorrentes na planilha;

@@ -1,8 +1,10 @@
 # 24. Padronização de Posicionamento e Estilos de Botões em Modais e Barras de Ação
 
 * **Data:** 2026-09-30
-* **Status:** Aceito
+* **Status:** Substituído parcialmente pelo ADR 0026
 * **Decisores:** Equipe Técnica SCAE / EESC-USP
+
+> ⚠️ **Nota de Atualização (ADR 0026):** As diretrizes da Seção 1 (posicionamento de confirmação à esquerda e cancelamento à direita com estilo primário invertido) foram revogadas e corrigidas pelo [ADR 0026](0026-correcao-ergonomia-ux-botoes-modais-confirmacao.md). Em modais de ação/confirmação, `Cancelar` (secundário outline) posiciona-se à esquerda e `Confirmar` (primário sólido institucional) posiciona-se no canto inferior direito terminal.
 
 ## Contexto e Problema
 Com a expansão contínua da aplicação e a introdução de novos diálogos modais (como o **Modal de Informações da Disciplina** e o **Modal de Preparação e Impressão da Grade**), bem como botões utilitários adicionais na barra superior de ações, tornou-se essencial formalizar uma convenção arquitetural e espacial estrita para o posicionamento e estilização de botões.
