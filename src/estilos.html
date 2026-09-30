@@ -406,7 +406,11 @@
     transform: none;
   }
 
-  .btn-reset {
+  .btn-reset,
+  .btn-imprimir-grade {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     background: #f1f5f9;
     color: #475569;
     border: 1px solid var(--border-dark);
@@ -426,7 +430,8 @@
                 transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .btn-reset:hover {
+  .btn-reset:hover,
+  .btn-imprimir-grade:hover {
     background: #e2e8f0;
     border-color: #94a3b8;
     color: var(--text-main);
@@ -434,13 +439,15 @@
     box-shadow: 0 2px 5px rgba(16, 72, 128, 0.08);
   }
 
-  .btn-reset:active {
+  .btn-reset:active,
+  .btn-imprimir-grade:active {
     transform: scale(0.96);
     box-shadow: 0 1px 2px rgba(16, 72, 128, 0.1);
     transition-duration: 0.05s;
   }
 
-  .btn-reset:focus-visible {
+  .btn-reset:focus-visible,
+  .btn-imprimir-grade:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(16, 72, 128, 0.25);
   }
@@ -2324,7 +2331,8 @@
     border-top: 1px solid var(--border-color);
   }
 
-  .btn-link-externo-jupiter {
+  .btn-link-externo-jupiter,
+  .btn-imprimir-confirmar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2350,7 +2358,8 @@
                 transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .btn-link-externo-jupiter:hover {
+  .btn-link-externo-jupiter:hover,
+  .btn-imprimir-confirmar:hover {
     background: var(--primary-light);
     border-color: var(--primary);
     color: var(--primary-hover);
@@ -2358,13 +2367,15 @@
     box-shadow: 0 2px 5px rgba(16, 72, 128, 0.09);
   }
 
-  .btn-link-externo-jupiter:active {
+  .btn-link-externo-jupiter:active,
+  .btn-imprimir-confirmar:active {
     transform: scale(0.96);
     box-shadow: 0 1px 2px rgba(16, 72, 128, 0.12);
     transition-duration: 0.05s;
   }
 
-  .btn-link-externo-jupiter:focus-visible {
+  .btn-link-externo-jupiter:focus-visible,
+  .btn-imprimir-confirmar:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(16, 72, 128, 0.25);
   }
@@ -2515,20 +2526,419 @@
     text-decoration: none;
   }
 
+  /* Oculta elementos de impressão exclusiva durante a exibição em tela normal */
+  .apenas-impressao {
+    display: none !important;
+  }
+
+  /* Modal de Preparação de Impressão */
+  .modal-impressao-card {
+    max-width: 620px;
+    width: 95%;
+  }
+
+  .modal-impressao-corpo {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .print-grid-opcoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .print-opcao-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .print-grupo-full {
+    grid-column: 1 / -1;
+  }
+
+  .print-grupo-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+
+  .print-radio-label, .print-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .print-radio-label input, .print-checkbox-label input {
+    cursor: pointer;
+    accent-color: var(--color-primary);
+  }
+
+  .print-resumo-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .print-resumo-titulo {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #166534;
+  }
+
+  .print-resumo-conteudo {
+    font-size: 11px;
+    color: #14532d;
+    line-height: 1.4;
+  }
+
+  .print-alerta-colunas {
+    font-size: 11px;
+    color: #854d0e;
+    background: #fef9c3;
+    border: 1px solid #fef08a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin-top: 4px;
+  }
+
+  .print-dica-orientacao {
+    font-size: 10.5px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
   @media (max-width: 540px) {
-    .modal-card {
-      max-height: 92vh;
-      border-radius: 10px;
+    .print-grid-opcoes {
+      grid-template-columns: 1fr;
     }
-    .modal-card-rodape {
-      flex-direction: column-reverse;
-      gap: 8px;
+  }
+
+  /* ==========================================================================
+     ARQUITETURA COMPLETA DE IMPRESSÃO EM PAPEL E EXPORTAÇÃO PDF (@media print)
+     ========================================================================== */
+  @media print {
+    /* 1. Reset da Estrutura de SPA (Permite quebra em múltiplas páginas sem corte 100vh) */
+    html, body {
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      display: block !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    .modal-card-rodape > * {
-      width: 100%;
-      text-align: center;
-      justify-content: center;
-      margin-left: 0 !important;
+
+    .app-main,
+    .grade-section,
+    .grade-scroll-wrapper {
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: none !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: #ffffff !important;
+    }
+
+    /* 2. Ocultação Estrita de Elementos de Interface Web */
+    .app-header,
+    .filtros-panel,
+    .modal-backdrop,
+    .busca-sugestoes-popover,
+    #toast-container,
+    .btn-colunas-match,
+    .status-carregamento-dinamico,
+    .loading-container,
+    .empty-container,
+    .icone-tempo-grade {
+      display: none !important;
+    }
+
+    /* 3. Visibilidade e Formatação do Cabeçalho Institucional Oficial */
+    .apenas-impressao {
+      display: block !important;
+    }
+
+    .cabecalho-impressao-papel {
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #0f172a;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .cabecalho-print-topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .cabecalho-print-instituicao {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .cabecalho-print-unidade {
+      font-size: 10px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .cabecalho-print-titulo {
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .cabecalho-print-metadados-bloco {
+      text-align: right;
+      font-size: 9px;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    .cabecalho-print-filtros {
+      margin-top: 4px;
+      font-size: 9.5px;
+      color: #1e293b;
+      line-height: 1.35;
+      background: #f8fafc;
+      padding: 3px 6px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+    }
+
+    body.impressao-sem-cabecalho #cabecalho-impressao-papel {
+      display: none !important;
+    }
+
+    /* 4. Configuração de Página e Tabela da Grade */
+    @page {
+      size: landscape;
+      margin: 8mm 6mm 8mm 6mm;
+    }
+
+    .tabela-grade {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      table-layout: auto !important;
+      font-size: 10px;
+    }
+
+    .tabela-grade * {
+      position: static !important;
+    }
+
+    .tabela-grade thead {
+      display: table-header-group !important;
+    }
+
+    .tabela-grade tr {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .tabela-grade td,
+    .tabela-grade th {
+      min-width: 0 !important;
+    }
+
+    .tabela-grade tbody tr:hover td {
+      background-color: transparent !important;
+    }
+
+    /* 5. Neutralização de Destaques Visuais de Interação da Tela */
+    .celula-destacada-busca {
+      box-shadow: none !important;
+    }
+
+    .celula-grade.celula-ativa-modal {
+      box-shadow: none !important;
+    }
+
+    /* 6. Modo Escala de Cinza (Econômico / Tinta & Toner) */
+    body.impressao-grayscale .tabela-grade thead th {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+      border: 1px solid #94a3b8 !important;
+      font-weight: 700 !important;
+    }
+
+    body.impressao-grayscale .tabela-grade thead th.th-dia-header,
+    body.impressao-grayscale .tabela-grade thead th.th-slot-header {
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+
+    body.impressao-grayscale .tabela-grade thead th.dia-hoje-atual,
+    body.impressao-grayscale .tabela-grade thead th.col-slot-atual {
+      background: #e2e8f0 !important;
+      color: #0f172a !important;
+      border: 1px solid #94a3b8 !important;
+    }
+
+    body.impressao-grayscale .tabela-grade .col-fixa-sala {
+      background: #ffffff !important;
+      color: #000000 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+
+    body.impressao-grayscale .tabela-grade .col-fixa-cap {
+      background: #f8fafc !important;
+      color: #334155 !important;
+      border: 1px solid #cbd5e1 !important;
+    }
+
+    body.impressao-grayscale .tabela-grade td {
+      border: 1px solid #cbd5e1 !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    /* Distinção Graduação vs Pós-Graduação em Escala de Cinza */
+    body.impressao-grayscale .celula-aula:not(.celula-pos) {
+      background-color: #ffffff !important;
+      border-left: 3.5px solid #475569 !important;
+      color: #000000 !important;
+    }
+
+    body.impressao-grayscale .celula-pos {
+      background-color: #f8fafc !important;
+      border-left: 4.5px double #0f172a !important;
+      color: #000000 !important;
+    }
+
+    body.impressao-grayscale .celula-pos a::after,
+    body.impressao-grayscale .celula-pos .link-pos::after {
+      content: " [PÓS]";
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      opacity: 0.85;
+      margin-left: 2px;
+    }
+
+    body.impressao-grayscale .celula-aula a,
+    body.impressao-grayscale .celula-pos a,
+    body.impressao-grayscale .link-disc {
+      color: #000000 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      font-weight: 700 !important;
+    }
+
+    /* 7. Modo Colorido (Fidelidade Web) */
+    body.impressao-colorida {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body.impressao-colorida .tabela-grade thead th.th-dia-header.dia-hoje-atual.dia-par {
+      background: #104880 !important;
+      color: #ffffff !important;
+      border-color: #1e5a96 !important;
+    }
+
+    body.impressao-colorida .tabela-grade thead th.th-dia-header.dia-hoje-atual.dia-impar {
+      background: #185a97 !important;
+      color: #ffffff !important;
+      border-color: #1e5a96 !important;
+    }
+
+    body.impressao-colorida .tabela-grade thead th.th-slot-header.col-slot-atual.dia-par {
+      background: #195b93 !important;
+      color: #ffffff !important;
+      border-color: #286ea8 !important;
+    }
+
+    body.impressao-colorida .tabela-grade thead th.th-slot-header.col-slot-atual.dia-impar {
+      background: #216ba6 !important;
+      color: #ffffff !important;
+      border-color: #317dbb !important;
+    }
+
+    body.impressao-colorida .celula-aula:not(.celula-pos) {
+      background-color: #f0f9ff !important;
+      border-color: #bae6fd !important;
+      color: #0369a1 !important;
+    }
+
+    body.impressao-colorida .celula-pos {
+      background-color: #eef2ff !important;
+      border-color: #c7d2fe !important;
+      color: #1e3a8a !important;
+    }
+
+    body.impressao-colorida .celula-destacada-busca:not(.celula-pos),
+    body.impressao-colorida .celula-ativa-modal:not(.celula-pos) {
+      background-color: #f0f9ff !important;
+      border-color: #bae6fd !important;
+      color: #0369a1 !important;
+    }
+
+    body.impressao-colorida .celula-destacada-busca.celula-pos,
+    body.impressao-colorida .celula-ativa-modal.celula-pos {
+      background-color: #eef2ff !important;
+      border-color: #c7d2fe !important;
+      color: #1e3a8a !important;
+    }
+
+    /* 8. Modo Compacto (Otimização Máxima para Folha A4) */
+    body.impressao-compacta .tabela-grade {
+      font-size: 9px !important;
+    }
+
+    body.impressao-compacta .tabela-grade thead th {
+      padding: 2px 3px !important;
+      font-size: 8.5px !important;
+    }
+
+    body.impressao-compacta .tabela-grade td {
+      padding: 2px 3px !important;
+      font-size: 8.5px !important;
+      line-height: 1.15 !important;
+    }
+
+    body.impressao-compacta .tabela-grade .col-fixa-sala {
+      width: 90px !important;
+      min-width: 80px !important;
+      max-width: 100px !important;
+      font-size: 9px !important;
+      padding-left: 4px !important;
+    }
+
+    /* 9. Ocultar Coluna de Lugares */
+    body.impressao-sem-lugares .col-fixa-cap {
+      display: none !important;
     }
   }
 </style>

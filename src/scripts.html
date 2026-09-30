@@ -2263,7 +2263,7 @@
       const bordaFim = !ehUltimoDia ? ' col-dia-fim' : '';
       const ehDiaHoje = (diaKey === chaveDiaHoje);
       const classeHoje = ehDiaHoje ? ' dia-hoje-atual' : '';
-      const iconeHoje = ehDiaHoje ? '⚡ ' : '';
+      const iconeHoje = ehDiaHoje ? '<span class="icone-tempo-grade" aria-hidden="true">⚡ </span>' : '';
       const titleDia = ehDiaHoje ? `${diaObj.nome} (Hoje)` : diaObj.nome;
       theadHtml += `<th colspan="${diaObj.slots.length}" class="th-dia-header ${diaClass}${bordaFim}${classeHoje}" title="${titleDia}">${iconeHoje}${diaObj.nome}</th>`;
     });
@@ -2286,7 +2286,7 @@
       }
 
       const rotuloSlot = s.label || s.textoInicio;
-      const iconeSlot = ehSlotDestaque ? '⚡ ' : '';
+      const iconeSlot = ehSlotDestaque ? '<span class="icone-tempo-grade" aria-hidden="true">⚡ </span>' : '';
       const titleAttr = ehSlotDestaque ? (estadoTemporal.textoTooltip || `${rotuloSlot} (Horário Atual / Próximo Horário)`) : rotuloSlot;
 
       theadHtml += `<th class="${classesSlot}" title="${titleAttr}">${iconeSlot}${rotuloSlot}</th>`;
@@ -3393,12 +3393,40 @@
       });
     }
 
-    // Tecla Escape para acessibilidade
+    // Gerenciador global de atalhos de teclado (Ctrl+P, Escape, Enter)
     window.addEventListener('keydown', function(e) {
+      // 1. Atalho Ctrl+P / Cmd+P para Preparação de Impressão
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        abrirModalImpressao();
+        return;
+      }
+
+      // 2. Tecla Escape para fechar modais
       if (e.key === 'Escape' || e.key === 'Esc') {
-        const modal = document.getElementById('modal-card-disciplina');
-        if (modal && modal.classList.contains('aberto')) {
+        const modalPrint = document.getElementById('modal-impressao-grade');
+        if (modalPrint && modalPrint.classList.contains('aberto')) {
+          fecharModalImpressao();
+          return;
+        }
+
+        const modalDisc = document.getElementById('modal-card-disciplina');
+        if (modalDisc && modalDisc.classList.contains('aberto')) {
           fecharCardDisciplina();
+          return;
+        }
+      }
+
+      // 3. Tecla Enter no modal de impressão para disparar
+      if (e.key === 'Enter') {
+        const modalPrint = document.getElementById('modal-impressao-grade');
+        if (modalPrint && modalPrint.classList.contains('aberto')) {
+          const elFocado = document.activeElement;
+          const ehBotaoFechar = elFocado && (elFocado.classList.contains('modal-btn-fechar') || elFocado.classList.contains('btn-fechar-modal'));
+          if (!ehBotaoFechar) {
+            e.preventDefault();
+            executarImpressaoGrade();
+          }
         }
       }
     });
@@ -4129,5 +4157,293 @@
       }, 150);
     }, { passive: true });
   }
+
+  // ==========================================================================
+  // MÓDULO DE PREPARAÇÃO E IMPRESSÃO DA GRADE (PAPEL / PDF)
+  // ==========================================================================
+
+  const MAPA_NOMES_DIAS_PRINT = {
+    seg: 'Segunda-feira',
+    ter: 'Terça-feira',
+    qua: 'Quarta-feira',
+    qui: 'Quinta-feira',
+    sex: 'Sexta-feira',
+    sab: 'Sábado'
+  };
+
+  /**
+   * Formata minutos a partir de 00:00 no formato HH:mm (ex: 480 -> "08:00").
+   */
+  function formatarMinutosParaHoraPrint(minutos) {
+    if (minutos === null || minutos === undefined || isNaN(minutos)) return '';
+    const h = Math.floor(minutos / 60);
+    const m = minutos % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  /**
+   * Formata o carimbo temporal oficial da impressão.
+   */
+  function formatarCarimboTemporalImpressao(dataReferencia) {
+    const data = dataReferencia || new Date();
+    try {
+      const dia = String(data.getDate()).padStart(2, '0');
+      const mes = String(data.getMonth() + 1).padStart(2, '0');
+      const ano = data.getFullYear();
+      const horas = String(data.getHours()).padStart(2, '0');
+      const minutos = String(data.getMinutes()).padStart(2, '0');
+      return `Emitido em ${dia}/${mes}/${ano} às ${horas}:${minutos}`;
+    } catch (e) {
+      return 'Emitido em ' + new Date().toLocaleDateString('pt-BR');
+    }
+  }
+
+  /**
+   * Compila o resumo textual estruturado dos filtros aplicados na visualização atual.
+   */
+  function gerarResumoFiltrosImpressao(estado, salasCount, slotsCount) {
+    const partes = [];
+    const est = estado || estadoApp;
+
+    // 1. Dias da Semana
+    const dias = est.diasSelecionados ? Array.from(est.diasSelecionados) : ['todos'];
+    if (dias.includes('todos') || dias.length === 0 || dias.length >= 6) {
+      partes.push('Todos os dias');
+    } else if (dias.length === 1) {
+      partes.push(MAPA_NOMES_DIAS_PRINT[dias[0]] || dias[0]);
+    } else {
+      const nomes = dias.map(d => MAPA_NOMES_DIAS_PRINT[d] ? MAPA_NOMES_DIAS_PRINT[d].replace('-feira', '') : d);
+      const ultimo = nomes.pop();
+      partes.push(`${nomes.join(', ')} e ${ultimo}`);
+    }
+
+    // 2. Horários
+    const temInicio = (est.horaInicioMin !== null && est.horaInicioMin !== undefined);
+    const temFim = (est.horaFimMin !== null && est.horaFimMin !== undefined);
+    if (temInicio && temFim) {
+      partes.push(`${formatarMinutosParaHoraPrint(est.horaInicioMin)} às ${formatarMinutosParaHoraPrint(est.horaFimMin)}`);
+    } else if (temInicio) {
+      partes.push(`A partir das ${formatarMinutosParaHoraPrint(est.horaInicioMin)}`);
+    } else if (temFim) {
+      partes.push(`Até às ${formatarMinutosParaHoraPrint(est.horaFimMin)}`);
+    }
+
+    // 3. Blocos
+    const blocos = est.blocosSelecionados ? Array.from(est.blocosSelecionados).filter(b => b !== 'todos') : [];
+    if (blocos.length === 1) {
+      partes.push(`Bloco ${blocos[0]}`);
+    } else if (blocos.length > 1) {
+      const ultBloco = blocos.pop();
+      partes.push(`Blocos ${blocos.join(', ')} e ${ultBloco}`);
+    }
+
+    // 4. Salas
+    const salas = est.salasSelecionadas ? Array.from(est.salasSelecionadas).filter(s => s !== 'todas') : [];
+    if (salas.length === 1) {
+      partes.push(`Sala ${salas[0]}`);
+    } else if (salas.length > 1) {
+      const ultSala = salas.pop();
+      partes.push(`Salas ${salas.join(', ')} e ${ultSala}`);
+    }
+
+    // 5. Capacidade Mínima
+    if (est.capacidadeMin && Number(est.capacidadeMin) > 0) {
+      partes.push(`Mín. ${est.capacidadeMin} lugares`);
+    }
+
+    // 6. Apenas Salas Livres
+    if (est.apenasLivres) {
+      partes.push('Apenas Salas Livres');
+    }
+
+    // 7. Busca Textual
+    if (est.buscaSala && String(est.buscaSala).trim()) {
+      partes.push(`Busca: "${String(est.buscaSala).trim()}"`);
+    }
+
+    // 8. Totalizadores de salas e horários
+    const sCount = (salasCount !== undefined && salasCount !== null) ? salasCount : (est._salasVisiveisAtuais ? est._salasVisiveisAtuais.length : 0);
+    const slCount = (slotsCount !== undefined && slotsCount !== null) ? slotsCount : (est._slotsAtivosAtuais ? est._slotsAtivosAtuais.length : 0);
+
+    const txtSalas = sCount === 1 ? '1 sala exibida' : `${sCount} salas exibidas`;
+    const txtSlots = slCount === 1 ? '1 horário' : `${slCount} horários`;
+
+    partes.push(`${txtSalas} • ${txtSlots}`);
+
+    return partes.join(' • ');
+  }
+
+  let elementoDisparadorImpressao = null;
+
+  /**
+   * Abre o Modal de Preparação de Impressão com validação prévia de salas.
+   */
+  function abrirModalImpressao() {
+    const salas = estadoApp._salasVisiveisAtuais || [];
+    if (!salas || salas.length === 0) {
+      exibirToast('Impressão da Grade', 'Não há salas visíveis na grade com os filtros atuais.', 'info');
+      return;
+    }
+
+    elementoDisparadorImpressao = document.activeElement;
+
+    const slots = estadoApp._slotsAtivosAtuais || [];
+    const resumo = gerarResumoFiltrosImpressao(estadoApp, salas.length, slots.length);
+    const elResumo = document.getElementById('print-modal-resumo-texto');
+    if (elResumo) {
+      elResumo.textContent = resumo;
+    }
+
+    const elAlerta = document.getElementById('print-modal-alerta-colunas');
+    if (elAlerta) {
+      if (slots.length > 25) {
+        elAlerta.textContent = `⚠️ Atenção: ${slots.length} horários ativos na visualização. Para garantir excelente legibilidade no papel, recomendamos filtrar menos dias/horários ou configurar a escala em 70% a 80% na janela de impressão.`;
+        elAlerta.style.display = 'block';
+      } else {
+        elAlerta.style.display = 'none';
+      }
+    }
+
+    const modal = document.getElementById('modal-impressao-grade');
+    if (modal) {
+      modal.classList.add('aberto');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    setTimeout(() => {
+      const btnConfirmar = document.getElementById('btn-confirmar-impressao');
+      if (btnConfirmar) btnConfirmar.focus();
+    }, 50);
+  }
+
+  /**
+   * Fecha o Modal de Impressão e devolve o foco ao elemento que o acionou.
+   */
+  function fecharModalImpressao() {
+    const modal = document.getElementById('modal-impressao-grade');
+    if (modal) {
+      modal.classList.remove('aberto');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    if (elementoDisparadorImpressao && typeof elementoDisparadorImpressao.focus === 'function') {
+      elementoDisparadorImpressao.focus();
+      elementoDisparadorImpressao = null;
+    }
+  }
+
+  /**
+   * Trata o clique no backdrop para fechar o modal.
+   */
+  function aoClicarForaModalImpressao(event) {
+    if (event.target && event.target.id === 'modal-impressao-grade') {
+      fecharModalImpressao();
+    }
+  }
+
+  /**
+   * Aplica classes de controle de impressão ao body e preenche o cabeçalho oficial de papel.
+   */
+  function configurarImpressaoNoDom(opcoes) {
+    const opts = opcoes || {
+      paleta: 'cinza',
+      densidade: 'compacto',
+      incluirCabecalho: true,
+      ocultarLugares: true
+    };
+
+    document.body.classList.add('modo-impressao-ativo');
+
+    if (opts.paleta === 'cor') {
+      document.body.classList.add('impressao-colorida');
+      document.body.classList.remove('impressao-grayscale');
+    } else {
+      document.body.classList.add('impressao-grayscale');
+      document.body.classList.remove('impressao-colorida');
+    }
+
+    if (opts.densidade === 'compacto') {
+      document.body.classList.add('impressao-compacta');
+    } else {
+      document.body.classList.remove('impressao-compacta');
+    }
+
+    if (opts.ocultarLugares) {
+      document.body.classList.add('impressao-sem-lugares');
+    } else {
+      document.body.classList.remove('impressao-sem-lugares');
+    }
+
+    if (!opts.incluirCabecalho) {
+      document.body.classList.add('impressao-sem-cabecalho');
+    } else {
+      document.body.classList.remove('impressao-sem-cabecalho');
+    }
+
+    // Preenche os metadados do cabeçalho institucional em papel
+    const elEmissao = document.getElementById('print-meta-emissao');
+    if (elEmissao) {
+      elEmissao.textContent = formatarCarimboTemporalImpressao();
+    }
+
+    const elFiltros = document.getElementById('print-meta-filtros');
+    if (elFiltros) {
+      const resumoTexto = gerarResumoFiltrosImpressao();
+      elFiltros.innerHTML = '<strong>Filtros aplicados:</strong> ' + escapeHtml(resumoTexto);
+    }
+  }
+
+  /**
+   * Lê as opções selecionadas no modal e dispara o diálogo nativo de impressão.
+   */
+  function executarImpressaoGrade() {
+    const paleta = document.getElementById('radio-print-cor')?.checked ? 'cor' : 'cinza';
+    const densidade = document.getElementById('radio-print-normal')?.checked ? 'normal' : 'compacto';
+    const incluirCabecalho = document.getElementById('chk-print-cabecalho')?.checked !== false;
+    const ocultarLugares = document.getElementById('chk-print-ocultar-lugares')?.checked !== false;
+
+    configurarImpressaoNoDom({
+      paleta: paleta,
+      densidade: densidade,
+      incluirCabecalho: incluirCabecalho,
+      ocultarLugares: ocultarLugares
+    });
+
+    // Registra listener único para restauração segura pós-impressão
+    window.addEventListener('afterprint', finalizarImpressao, { once: true });
+
+    // Dispara diálogo do navegador
+    window.print();
+  }
+
+  /**
+   * Limpa idempotentemente todas as classes transitórias de impressão do DOM.
+   */
+  function finalizarImpressao() {
+    document.body.classList.remove(
+      'modo-impressao-ativo',
+      'impressao-grayscale',
+      'impressao-colorida',
+      'impressao-compacta',
+      'impressao-sem-lugares',
+      'impressao-sem-cabecalho'
+    );
+    fecharModalImpressao();
+  }
+
+  // Fallback e sincronização nativa com atalhos ou menu nativo do browser (Arquivo > Imprimir)
+  window.addEventListener('beforeprint', function() {
+    if (!document.body.classList.contains('modo-impressao-ativo')) {
+      configurarImpressaoNoDom({
+        paleta: 'cinza',
+        densidade: 'compacto',
+        incluirCabecalho: true,
+        ocultarLugares: true
+      });
+    }
+  });
+
+  window.addEventListener('afterprint', function() {
+    finalizarImpressao();
+  });
 </script>
 

@@ -3,7 +3,14 @@
 ---
 
 
-Colocar fotos de docentes no cartão flutuante
+- [ ] Colocar fotos de docentes no cartão flutuante
+- [ ] Capturar mais dados das visitas ao site
+- [ ] Inserir botões de filtro rápido Manhã / Tarde
+- [ ] Criar configurações persistentes para preferências: horário, sala, dia etc.
+
+
+
+
 
 # 📋 Backlog & Banco de Ideias — Alocação Plus
 
@@ -71,6 +78,21 @@ flowchart LR
 ## ✅ Concluído (Done)
 <!-- Histórico de melhorias entregues (com indicação da versão) -->
 
+- [x] **v1.9.1:** Padronização de Posicionamento e Estilos de Botões em Modais e Ações (ADR 0024):
+  - **Formatação Homogênea na Barra de Ações:** O botão `🖨️ Imprimir Grade` adota a mesma identidade visual táctil de `🧹 Limpar Filtros` (`.btn-reset`);
+  - **Identidade Visual de Ação em Modais:** O botão `🖨️ Imprimir / Salvar PDF` do modal adota a formatação estilizada de ação institucional (`.btn-link-externo-jupiter` / `.btn-imprimir-confirmar`);
+  - **Regra Universal de Posicionamento Espacial:** Formalização da diretriz de UX onde botões de Fechar/Cancelar/Voltar posicionam-se estritamente à direita e botões de ação e confirmação (OK/Confirmar/Imprimir/Salvar) posicionam-se à esquerda ou centralizados em todos os modais;
+  - **ADR 0024 e Testes Automatizados:** Registrado formalmente no [ADR 0024](docs/adr/0024-padronizacao-posicionamento-e-estilos-de-botoes-em-modais-e-acoes.md) e coberto por testes unitários em `tests/test_print_logic.py` (elevando a suíte para 144 testes automatizados com 100% de sucesso).
+- [x] **v1.9.0:** Preparação e Impressão Inteligente da Grade Horária (Papel e PDF):
+  - **Quebra da Barreira de SPAs no Navegador:** Reset completo e em cascata de `html, body`, `.app-main`, `.grade-section` e `.grade-scroll-wrapper` em `@media print`, eliminando o corte de páginas em `100vh` e permitindo paginação contínua da grade em múltiplas folhas;
+  - **Cabeçalho Institucional Oficial para Impressão:** Inclusão de `#cabecalho-impressao-papel` (`.apenas-impressao`) com identificação formal da USP/EESC, resumo dinâmico de todos os filtros ativos e carimbo temporal de emissão no fuso de Brasília;
+  - **Paleta em Escala de Cinza Econômica (Tinta & Toner):** Eliminação de fundos escuros e saturados com retorno das células a fundo branco (`#ffffff`), distinção tátil e visual de Graduação vs. Pós-Graduação através de borda sólida vs. borda dupla (`4.5px double #0f172a`) e marcador tipográfico `[PÓS]`, reduzindo o consumo de tinta/toner em mais de 90%;
+  - **Modo Colorido (Fidelidade Web):** Preservação dos azuis oficiais com calibração `-webkit-print-color-adjust: exact; print-color-adjust: exact;` e proteção automática para células com enriquecimento pendente;
+  - **Densidade Compacta & Ocultação de Lugares:** Redução otimizada de padding e tipografia (`body.impressao-compacta`) e opção de ocultar a coluna de capacidade (`body.impressao-sem-lugares`), permitindo acomodar 30-50% mais salas e horários em folha A4 Paisagem;
+  - **Neutralização de Destaques Visuais:** Ocultação do ícone de raio (`⚡`) do cabeçalho via isolamento em `.icone-tempo-grade` e remoção dos fundos amarelos de hoje/agora (`.dia-hoje-atual`, `.col-slot-atual`), busca (`.celula-destacada-busca`) e foco (`.celula-ativa-modal`);
+  - **Modal Interativo & Atalhos de Teclado:** Abertura via botão `🖨️ Imprimir Grade` ou atalho global `Ctrl + P` / `Cmd + P`, com suporte a `Enter` (confirmar) e `Esc` (cancelar), alerta dinâmico de colunas para ajustes de escala e restauração idempotente do DOM no `afterprint`;
+  - **Qualidade & Testes Automatizados:** Criação da suíte `tests/test_print_logic.py` com testes unitários e property fuzzing, elevando a suíte para 143 testes automatizados (100% de sucesso);
+  - **Documentação:** Especificação técnica detalhada em `docs/preparacao-e-impressao-grade.md`.
 - [x] **v1.8.0:** Destaque do Próximo Bloco de Horário Durante Intervalos e Pré-Expediente na Grade:
   - **Destaque Dinâmico com Identidade Visual Padronizada:** Durante os intervalos entre aulas (recessos matutino e vespertino de 10-20 min, almoço e jantar) e pré-expediente matutino, o próximo bloco letivo a iniciar recebe o destaque visual padrão existente da aplicação (fundo amarelo suave e ícone de raio `⚡ ` na classe `.col-slot-atual`), dispensando a introdução de novos estilos ou tags no DOM e preservando a elegância e simplicidade da interface;
   - **Prevenção de Falsos Intervalos:** Resolução temporal avaliada contra a grade mestra da universidade (`todosSlots`), garantindo que filtros de busca textual ou horários ocultando a aula corrente nunca marquem horários posteriores como intervalos indevidos;

@@ -102,6 +102,21 @@ Para que botões na mesma linha nunca fiquem desalinhados:
 
 ---
 
+## 🧭 Regra Universal de Posicionamento Espacial (Esquerda vs. Direita)
+
+Formalizada no **ADR 0024**, esta diretriz rege o posicionamento de ações em todo o ecossistema do **Alocação Plus**:
+
+1. **Lado Direito — Ações de Saída, Fechamento e Cancelamento:**
+   * Botões como `Fechar`, `Cancelar` e similares devem **sempre ficar no lado direito** do rodapé de modais e caixas de diálogo.
+   * Empregam a variante sólida institucional `.btn-fechar-modal`.
+2. **Lado Esquerdo ou Centralizado — Ações Positivas, Operações e Confirmações:**
+   * Botões como `OK`, `Confirmar`, `🖨️ Imprimir / Salvar PDF`, `Abrir no Jupiterweb ↗`, `Trocar de Sala ⇄` e `Filtrar disciplina` devem **ficar posicionados no lado esquerdo ou centralizados**, conforme o fluxo de leitura do leiaute.
+   * Empregam a variante outline secundária padronizada (`.btn-link-externo-jupiter`, `.btn-imprimir-confirmar`).
+3. **Barra Superior de Ações Rápidas da Grade:**
+   * Botões operacionais complementares (`🖨️ Imprimir Grade`) compartilham a mesma formatação visual e tátil do botão `🧹 Limpar Filtros` (`.btn-reset`, `.btn-imprimir-grade`), mantendo harmonia cromática neutra.
+
+---
+
 ## ♿ Acessibilidade (Prefers-Reduced-Motion)
 
 Sempre que registrar um novo botão com animações, inclua a classe na regra global de movimento reduzido em [`src/estilos.html`](../src/estilos.html):

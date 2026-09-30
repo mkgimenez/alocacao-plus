@@ -170,6 +170,9 @@
               <div id="barra-progresso-dinamico-fill" class="progresso-dinamico-barra" style="width: 0%;"></div>
             </div>
           </div>
+          <button type="button" id="btn-abrir-impressao" class="btn-reset btn-imprimir-grade" onclick="abrirModalImpressao()" title="Preparar e imprimir a grade atual em papel ou PDF">
+            🖨️ Imprimir Grade
+          </button>
           <button type="button" class="btn-reset" onclick="resetarTodosFiltros()">
             🧹 Limpar Filtros
           </button>
@@ -190,6 +193,23 @@
 
       <!-- Container da Tabela (com Scroll Horizontal e Vertical) -->
       <div id="grade-tabela-container" class="grade-scroll-wrapper" style="display: none;">
+        <!-- Cabeçalho Oficial para Impressão e Exportação em Papel/PDF -->
+        <div id="cabecalho-impressao-papel" class="cabecalho-impressao-papel apenas-impressao" aria-hidden="true">
+          <div class="cabecalho-print-topo">
+            <div class="cabecalho-print-instituicao-bloco">
+              <div class="cabecalho-print-instituicao">UNIVERSIDADE DE SÃO PAULO</div>
+              <div class="cabecalho-print-unidade">ESCOLA DE ENGENHARIA DE SÃO CARLOS — EESC</div>
+              <div class="cabecalho-print-titulo">Alocação Plus — Grade Horária e Ocupação de Salas</div>
+            </div>
+            <div class="cabecalho-print-metadados-bloco">
+              <div id="print-meta-emissao" class="print-meta-linha">Emitido em --/--/---- às --:--</div>
+              <div id="print-meta-versao" class="print-meta-linha">Alocação Plus <?= APP_FULL_VERSION ?></div>
+            </div>
+          </div>
+          <div id="print-meta-filtros" class="cabecalho-print-filtros">
+            <strong>Filtros aplicados:</strong> Todos os dias • Todos os horários
+          </div>
+        </div>
         <table id="tabela-grade" class="tabela-grade">
           <thead id="grade-cabecalho">
             <!-- Gerado dinamicamente no Passo 2 e 3 -->
@@ -318,6 +338,79 @@
         <button type="button" class="btn-fechar-modal" onclick="fecharCardDisciplina()">Fechar</button>
       </footer>
 
+    </div>
+  </div>
+
+  <!-- Modal de Configuração e Preparação da Impressão da Grade -->
+  <div id="modal-impressao-grade" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-impressao" onclick="aoClicarForaModalImpressao(event)">
+    <div class="modal-card modal-impressao-card">
+      <header class="modal-card-cabecalho">
+        <div class="modal-card-titulos">
+          <div class="modal-card-sigla-linha">
+            <span class="badge-modalidade">Exportação de Documento</span>
+          </div>
+          <h2 id="titulo-modal-impressao" class="modal-disc-nome">🖨️ Preparar Impressão da Grade</h2>
+        </div>
+        <button type="button" class="modal-btn-fechar" id="modal-btn-fechar-print" onclick="fecharModalImpressao()" aria-label="Fechar modal">&times;</button>
+      </header>
+
+      <div class="modal-card-corpo modal-impressao-corpo">
+        <div class="print-grid-opcoes">
+          <!-- Paleta de Cores -->
+          <div class="print-opcao-grupo">
+            <span class="print-grupo-titulo">🎨 Paleta de Cores</span>
+            <label class="print-radio-label">
+              <input type="radio" name="print-paleta" id="radio-print-cinza" value="cinza" checked>
+              <span><strong>Escala de Cinza</strong> (Econômico / Toner)</span>
+            </label>
+            <label class="print-radio-label">
+              <input type="radio" name="print-paleta" id="radio-print-cor" value="cor">
+              <span><strong>Colorido</strong> (Fidelidade Web)</span>
+            </label>
+          </div>
+
+          <!-- Densidade -->
+          <div class="print-opcao-grupo">
+            <span class="print-grupo-titulo">📐 Densidade da Grade</span>
+            <label class="print-radio-label">
+              <input type="radio" name="print-densidade" id="radio-print-compacto" value="compacto" checked>
+              <span><strong>Compacto</strong> (Ajuste p/ folha A4)</span>
+            </label>
+            <label class="print-radio-label">
+              <input type="radio" name="print-densidade" id="radio-print-normal" value="normal">
+              <span><strong>Normal</strong> (Mesmo espaçamento de tela)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Opções Adicionais -->
+        <div class="print-opcao-grupo print-grupo-full">
+          <span class="print-grupo-titulo">⚙️ Opções Adicionais</span>
+          <label class="print-checkbox-label">
+            <input type="checkbox" id="chk-print-cabecalho" checked>
+            <span>Incluir cabeçalho institucional oficial (USP / EESC, data/hora e resumo dos filtros)</span>
+          </label>
+          <label class="print-checkbox-label">
+            <input type="checkbox" id="chk-print-ocultar-lugares" checked>
+            <span>Ocultar coluna "Lugares" (ganho de espaço horizontal para os nomes das disciplinas)</span>
+          </label>
+        </div>
+
+        <!-- Resumo Dinâmico do Escopo da Impressão -->
+        <div class="print-resumo-box">
+          <div class="print-resumo-titulo">📋 Escopo da Impressão Atual:</div>
+          <div id="print-modal-resumo-texto" class="print-resumo-conteudo">Carregando resumo dos filtros...</div>
+          <div id="print-modal-alerta-colunas" class="print-alerta-colunas" style="display: none;"></div>
+          <div class="print-dica-orientacao">💡 <em>A orientação ideal recomendada no diálogo do navegador é <strong>PAISAGEM (Landscape)</strong>.</em></div>
+        </div>
+      </div>
+
+      <footer class="modal-card-rodape">
+        <button type="button" id="btn-confirmar-impressao" class="btn-link-externo-jupiter btn-imprimir-confirmar" onclick="executarImpressaoGrade()">
+          🖨️ Imprimir / Salvar PDF
+        </button>
+        <button type="button" class="btn-fechar-modal" onclick="fecharModalImpressao()">Cancelar</button>
+      </footer>
     </div>
   </div>
 

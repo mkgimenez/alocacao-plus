@@ -34,6 +34,7 @@ O **Alocação Plus** é uma aplicação web autônoma projetada para modernizar
     - **No Hover:** Exibe o nome do docente responsável (`Docente: [Nome]` ou `Docentes: [Nome 1], [Nome 2]`) e informações de oferecimento.
     - **No Clique:** Abre instantaneamente o **Card Modal Elegante** com estado de carregamento (*skeleton shimmer*), seleção de turmas por pills, horários oficiais, contagem de alunos matriculados (Graduação) ou vagas oferecidas (Pós-Graduação), docentes e observações.
     - **Acesso Externo:** Botões dedicados no rodapé do modal ("*Abrir no Jupiterweb ↗*" / "*Abrir no Janus ↗*") para consulta direta aos portais oficiais em nova aba.
+- **🖨️ Preparação e Impressão Inteligente da Grade (Papel e PDF):** Rotina avançada para impressão e exportação em formato paisagem com suporte a atalhos (`Ctrl + P` / `Cmd + P`), cabeçalho institucional oficial com resumo de filtros e carimbo temporal (Brasília), neutralização de destaques de interação e tempo real, e escolha entre **Modo Escala de Cinza** (alta economia de tinta/toner, fundo branco e distinção Graduação vs Pós via borda dupla e marcador tipográfico `[PÓS]`) e **Modo Colorido** (`print-color-adjust: exact`). Possui opção de **Densidade Compacta** (maximizando salas e horários em folha A4) e ocultação opcional da coluna de capacidade.
 - **⚙️ Parametrização sem Código:** A equipe acadêmica pode alternar IDs de planilhas e tempos de cache via aba `_Config` sem tocar no código-fonte.
 
 ---
@@ -59,6 +60,7 @@ alocacao-plus/
 │   └── appsscript.json            # Manifesto de configuração do Apps Script (V8)
 │
 ├── docs/                          # Documentação e especificações de regras de negócio
+│   ├── preparacao-e-impressao-grade.md # Especificação da impressão inteligente em papel/PDF
 │   ├── especificacao-disciplinas.md # Gramática de códigos de turmas e cores oficiais
 │   ├── especificacao-parser-jupiterweb.md # Especificação técnica do parser Jupiterweb
 │   ├── implementacao-enriquecimento-jupiterweb.md # Histórico de implementação e homologação
@@ -67,8 +69,9 @@ alocacao-plus/
 │       ├── README.md              # Índice cronológico e template de decisões
 │       └── 0001-*.md              # Registros de decisões técnicas individuais
 │
-├── tests/                         # Suíte de testes automatizados e fixtures (122 testes)
+├── tests/                         # Suíte de testes automatizados e fixtures (144 testes)
 │   ├── run_all_tests.py           # Orquestrador central de testes com relatórios coloridos
+│   ├── test_print_logic.py        # Validação da impressão inteligente, resumo e CSS
 │   ├── test_intervalo_slot_logic.py # Resolução temporal, intervalos, contagem regressiva e fuzzing
 │   ├── test_cell_coloring_logic.py # Validação de coloração progressiva e classes CSS
 │   ├── test_queue_logic.py        # Fila 2D de viewport, reordenação em scroll e concorrência
